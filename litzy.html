@@ -262,7 +262,7 @@ function cartClear() { localStorage.removeItem(lsKey()); cart = []; }
 function addItem(id) {
   const item = itemsMap[id]; if (!item) return;
   const e = cart.find(c => c.id === id);
-  e ? e.qty++ : cart.push({id, nombre:item.nombre, precio:item.precio, qty:1});
+  e ? e.qty++ : cart.push({id, nombre:item.nombre, precio:item.precio, qty:1, pagina:item.pagina, seccion:item.seccion});
   cartSave(); updateCartUI();
 }
 function removeItem(id) {
@@ -363,7 +363,7 @@ function renderMenuContent() {
     </div>`;
     sec.items.forEach((item, ii) => {
       const id = `p${pageIdx}s${si}i${ii}`;
-      itemsMap[id] = item;
+      itemsMap[id] = {...item, pagina:page.titulo, seccion:sec.titulo};
       const inCart = cart.find(c => c.id === id);
       const qty = inCart ? inCart.qty : 0;
       const showPrecio = item.precio && item.precio !== '$0';
@@ -420,13 +420,34 @@ function buildMsg() {
   const hh = String(now.getHours()).padStart(2,'0');
   const mm = String(now.getMinutes()).padStart(2,'0');
   let msg = `*${mesaLabel()} — ${hh}:${mm}*\n`;
+
+  // Agrupa por página y luego por sección
+  const byPage = {};
+  const pageOrder = [];
   cart.forEach(item => {
-    const p = (item.precio && item.precio !== '$0') ? ` — ${item.precio}` : '';
-    msg += `• ${item.qty}× ${item.nombre}${p}\n`;
+    const pg  = item.pagina  || '';
+    const sec = item.seccion || '';
+    if (!byPage[pg]) { byPage[pg] = {}; pageOrder.push(pg); }
+    if (!byPage[pg][sec]) byPage[pg][sec] = [];
+    byPage[pg][sec].push(item);
   });
+
+  pageOrder.forEach(pg => {
+    const secs = byPage[pg];
+    const secKeys = Object.keys(secs);
+    if (pg) msg += `\n*${pg}*\n`;
+    secKeys.forEach(sec => {
+      if (sec && secKeys.length > 1) msg += `_${sec}_\n`;
+      secs[sec].forEach(item => {
+        const p = (item.precio && item.precio !== '$0') ? ` — ${item.precio}` : '';
+        msg += `• ${item.qty}× ${item.nombre}${p}\n`;
+      });
+    });
+  });
+
   if (hasRealPrices()) {
     const t = cartTotal();
-    msg += `*Total: $${t.toLocaleString('es-AR')}*`;
+    msg += `\n*Total: $${t.toLocaleString('es-AR')}*`;
   }
   return msg.trim();
 }
