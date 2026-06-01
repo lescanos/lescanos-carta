@@ -24,30 +24,7 @@ jobs:
           ADMIN_PWD: ${{ secrets.ADMIN_PWD }}
           WA_NUMBER: ${{ secrets.WA_NUMBER }}
           NUM_MESAS: ${{ secrets.NUM_MESAS }}
-        run: |
-          python3 - <<'EOF'
-          import os
-
-          replacements = {
-            'dist/index.html': [
-              ('__ADMIN_PWD__', os.environ['ADMIN_PWD']),
-            ],
-            'dist/litzy.html': [
-              ('__WA_NUMBER__', os.environ['WA_NUMBER']),
-              ('__NUM_MESAS__', os.environ['NUM_MESAS']),
-            ],
-          }
-
-          for path, pairs in replacements.items():
-            with open(path, encoding='utf-8') as f:
-              content = f.read()
-            for placeholder, value in pairs:
-              content = content.replace(placeholder, value)
-            with open(path, 'w', encoding='utf-8') as f:
-              f.write(content)
-
-          print('Secrets injected OK')
-          EOF
+        run: python3 .github/inject.py
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
