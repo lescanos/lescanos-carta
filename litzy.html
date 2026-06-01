@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>Lescano's — Pedidos</title>
+  <script src="menu.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --gold:#C9A84C;--dark:#111111;--dark2:#1C1C1C;
+      --gray:#888888;--border:rgba(201,168,76,.18);
+    }
+    html,body{width:100%;height:100%;overflow:hidden;
+      background:var(--dark);font-family:'Lato',sans-serif;
+      -webkit-tap-highlight-color:transparent;color:#fff;}
+
+    /* ── APP ── */
+    #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+    .screen{display:none;flex-direction:column;height:100%;}
+    .screen.active{display:flex;}
+
+    /* ── HEADER ── */
+    .hdr{
+      background:var(--dark2);border-bottom:1px solid var(--border);
+      padding:13px 16px;display:flex;align-items:center;gap:10px;
+      flex-shrink:0;min-height:52px;
+    }
+    .hdr-brand{
+      font-family:'Playfair Display',serif;font-size:1.05rem;
+      font-weight:900;color:var(--gold);letter-spacing:.06em;
+    }
+    .hdr-sub{font-size:.6rem;color:var(--gray);letter-spacing:.14em;margin-left:3px;}
+    .hdr-mesa{flex:1;font-size:.95rem;font-weight:700;color:var(--gold);}
+    .back-btn{
+      background:transparent;border:none;color:var(--gold);
+      font-size:1.5rem;cursor:pointer;padding:2px 8px 2px 0;line-height:1;
+    }
+    .cart-pill{
+      background:var(--gold);color:var(--dark);font-size:.7rem;font-weight:700;
+      min-width:26px;height:26px;border-radius:13px;
+      display:flex;align-items:center;justify-content:center;padding:0 7px;
+    }
+
+    /* ── SCREEN: MESAS ── */
+    .mesa-heading{
+      padding:14px 16px 6px;font-size:.65rem;color:var(--gray);
+      letter-spacing:.18em;text-transform:uppercase;flex-shrink:0;
+    }
+    .mesa-grid{
+      flex:1;overflow-y:auto;display:grid;
+      grid-template-columns:repeat(3,1fr);gap:10px;
+      padding:6px 16px 20px;align-content:start;
+    }
+    .mesa-btn{
+      background:var(--dark2);border:2px solid var(--border);
+      border-radius:12px;padding:18px 8px;text-align:center;cursor:pointer;
+      transition:border-color .15s;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:5px;min-height:78px;
+    }
+    .mesa-btn:active{background:#222;border-color:rgba(201,168,76,.5);}
+    .mesa-btn.llevar{
+      grid-column:span 3;flex-direction:row;gap:10px;padding:15px;
+    }
+    .mesa-num{
+      font-family:'Playfair Display',serif;font-size:1.35rem;
+      font-weight:900;color:var(--gold);
+    }
+    .mesa-lbl{font-size:.58rem;color:var(--gray);letter-spacing:.12em;text-transform:uppercase;}
+    .llevar-lbl{font-size:.95rem;font-weight:700;color:var(--gold);letter-spacing:.04em;}
+
+    /* ── SCREEN: MENU ── */
+    .page-tabs{
+      display:flex;overflow-x:auto;border-bottom:1px solid var(--border);
+      flex-shrink:0;-webkit-overflow-scrolling:touch;
+    }
+    .page-tabs::-webkit-scrollbar{display:none;}
+    .p-tab{
+      padding:11px 15px;flex-shrink:0;font-size:.72rem;font-weight:700;
+      color:var(--gray);letter-spacing:.04em;cursor:pointer;
+      border-bottom:2px solid transparent;margin-bottom:-1px;
+      white-space:nowrap;transition:color .15s;
+    }
+    .p-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+    .menu-scroll{flex:1;overflow-y:auto;padding-bottom:76px;-webkit-overflow-scrolling:touch;}
+    .sec-hdr{
+      background:rgba(201,168,76,.07);border-bottom:1px solid var(--border);
+      padding:8px 16px;display:flex;align-items:center;gap:8px;
+      position:sticky;top:0;z-index:2;backdrop-filter:blur(6px);
+    }
+    .sec-title{font-size:.75rem;font-weight:700;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;}
+    .sec-nota{font-size:.62rem;color:var(--gray);margin-left:auto;font-style:italic;}
+    .m-item{
+      display:flex;align-items:center;padding:12px 16px;
+      border-bottom:.5px solid rgba(255,255,255,.05);gap:12px;
+    }
+    .m-info{flex:1;min-width:0;}
+    .m-nombre{font-size:.9rem;font-weight:700;color:#fff;line-height:1.2;}
+    .m-desc{font-size:.68rem;color:var(--gray);font-style:italic;margin-top:2px;line-height:1.3;}
+    .m-precio{
+      font-family:'Playfair Display',serif;font-size:.8rem;
+      color:var(--gold);white-space:nowrap;flex-shrink:0;
+    }
+    .qty-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    .q-btn{
+      width:36px;height:36px;border:1.5px solid rgba(201,168,76,.35);
+      border-radius:50%;background:transparent;color:var(--gold);
+      font-size:1.25rem;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;line-height:1;transition:background .1s;flex-shrink:0;
+    }
+    .q-btn:active{background:rgba(201,168,76,.15);}
+    .q-num{font-size:.9rem;font-weight:700;color:#fff;min-width:18px;text-align:center;}
+    .menu-ftr{
+      position:fixed;bottom:0;left:0;right:0;
+      padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--dark) 65%,transparent);
+    }
+    .btn-ver{
+      width:100%;padding:14px;background:var(--gold);color:var(--dark);
+      font-weight:700;font-size:.95rem;border:none;border-radius:10px;
+      cursor:pointer;letter-spacing:.04em;transition:opacity .15s;
+    }
+    .btn-ver:disabled{background:rgba(201,168,76,.22);color:rgba(0,0,0,.35);cursor:default;}
+    .btn-ver:not(:disabled):active{opacity:.82;}
+
+    /* ── SCREEN: RESUMEN ── */
+    .resumen-scroll{flex:1;overflow-y:auto;padding-bottom:130px;-webkit-overflow-scrolling:touch;}
+    .r-item{
+      display:flex;align-items:center;padding:13px 16px;
+      border-bottom:.5px solid rgba(255,255,255,.05);gap:12px;
+    }
+    .r-qty{
+      background:var(--gold);color:var(--dark);font-size:.75rem;font-weight:700;
+      border-radius:6px;padding:3px 8px;flex-shrink:0;
+    }
+    .r-nombre{flex:1;font-size:.9rem;color:#fff;font-weight:500;}
+    .r-precio{font-family:'Playfair Display',serif;font-size:.82rem;color:var(--gold);}
+    .r-total{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:14px 16px;border-top:1px solid rgba(201,168,76,.22);
+    }
+    .r-total-lbl{font-size:.85rem;color:var(--gray);font-weight:700;}
+    .r-total-val{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--gold);}
+    .resumen-ftr{
+      position:fixed;bottom:0;left:0;right:0;
+      padding:10px 16px 18px;
+      background:linear-gradient(to top,var(--dark) 65%,transparent);
+    }
+    .btn-enviar{
+      width:100%;padding:14px;background:#2a6f2a;color:#fff;
+      font-weight:700;font-size:.95rem;border:none;border-radius:10px;
+      cursor:pointer;letter-spacing:.04em;transition:opacity .15s;
+    }
+    .btn-enviar:active{opacity:.82;}
+    .fallback{margin-top:9px;display:none;}
+    .fallback textarea{
+      width:100%;height:72px;background:var(--dark2);
+      border:1px solid var(--border);color:#bbb;font-size:.78rem;
+      padding:8px 10px;border-radius:8px;resize:none;font-family:monospace;
+    }
+    .btn-copiar{
+      width:100%;margin-top:6px;padding:11px;background:transparent;
+      color:var(--gold);border:1.5px solid var(--gold);border-radius:8px;
+      font-weight:700;font-size:.85rem;cursor:pointer;letter-spacing:.04em;
+    }
+    .btn-copiar:active{background:rgba(201,168,76,.1);}
+
+    /* ── TOAST ── */
+    .toast{
+      position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
+      background:rgba(40,40,40,.96);color:#fff;padding:8px 18px;
+      border-radius:20px;font-size:.8rem;letter-spacing:.04em;
+      opacity:0;transition:opacity .3s;pointer-events:none;
+      z-index:999;white-space:nowrap;border:1px solid var(--border);
+    }
+    .toast.show{opacity:1;}
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── MESAS ── -->
+  <div class="screen" id="screen-mesas">
+    <div class="hdr">
+      <div class="hdr-brand">Lescano's</div>
+      <div class="hdr-sub">— Pedidos</div>
+    </div>
+    <div class="mesa-heading">¿Para qué mesa?</div>
+    <div class="mesa-grid" id="mesa-grid"></div>
+  </div>
+
+  <!-- ── MENU ── -->
+  <div class="screen" id="screen-menu">
+    <div class="hdr">
+      <button class="back-btn" id="back-mesas">‹</button>
+      <div class="hdr-mesa" id="hdr-mesa">Mesa 1</div>
+      <div class="cart-pill" id="cart-pill">0</div>
+    </div>
+    <div class="page-tabs" id="page-tabs"></div>
+    <div class="menu-scroll" id="menu-scroll"></div>
+    <div class="menu-ftr">
+      <button class="btn-ver" id="btn-ver" disabled>Ver resumen · 0 items</button>
+    </div>
+  </div>
+
+  <!-- ── RESUMEN ── -->
+  <div class="screen" id="screen-resumen">
+    <div class="hdr">
+      <button class="back-btn" id="back-menu">‹</button>
+      <div class="hdr-mesa" id="hdr-resumen-mesa">Mesa 1</div>
+    </div>
+    <div class="resumen-scroll" id="resumen-scroll"></div>
+    <div class="resumen-ftr">
+      <button class="btn-enviar" id="btn-enviar">📲 Enviar a cocina</button>
+      <div class="fallback" id="fallback">
+        <textarea id="fallback-txt" readonly></textarea>
+        <button class="btn-copiar" id="btn-copiar">Copiar texto</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────
+const WA_NUMBER = '5493412282814'; // ← reemplazar con el número real de cocina (sin + ni espacios)
+const NUM_MESAS = 9;               // ← cantidad de mesas del local
+
+// ── MENU DATA ────────────────────────────────────────
+function getMenu() {
+  try {
+    const s = localStorage.getItem('lescanos_carta');
+    return s ? JSON.parse(s) : DEFAULT_CARTA;
+  } catch(e) { return DEFAULT_CARTA; }
+}
+
+// ── STATE ─────────────────────────────────────────────
+let mesa = null;   // 'mesa_1' … 'mesa_7' | 'llevar'
+let cart = [];     // [{id, nombre, precio, qty}]
+let pageIdx = 0;
+let itemsMap = {}; // id → item, rebuilt on each renderMenuContent()
+
+// ── LOCALSTORAGE ──────────────────────────────────────
+const lsKey = () => mesa === 'llevar' ? 'lescanos_order_llevar' : `lescanos_order_${mesa}`;
+
+function cartLoad() {
+  try { cart = JSON.parse(localStorage.getItem(lsKey())) || []; }
+  catch(e) { cart = []; }
+}
+function cartSave() {
+  cart.length ? localStorage.setItem(lsKey(), JSON.stringify(cart))
+              : localStorage.removeItem(lsKey());
+}
+function cartClear() { localStorage.removeItem(lsKey()); cart = []; }
+
+// ── CART OPS ──────────────────────────────────────────
+function addItem(id) {
+  const item = itemsMap[id]; if (!item) return;
+  const e = cart.find(c => c.id === id);
+  e ? e.qty++ : cart.push({id, nombre:item.nombre, precio:item.precio, qty:1});
+  cartSave(); updateCartUI();
+}
+function removeItem(id) {
+  const i = cart.findIndex(c => c.id === id); if (i === -1) return;
+  cart[i].qty > 1 ? cart[i].qty-- : cart.splice(i, 1);
+  cartSave(); updateCartUI();
+}
+function cartCount() { return cart.reduce((s,c) => s + c.qty, 0); }
+function cartTotal() {
+  return cart.reduce((s,c) => s + (parseInt((c.precio||'').replace(/\D/g,''))||0) * c.qty, 0);
+}
+function hasRealPrices() {
+  return cart.some(c => (parseInt((c.precio||'').replace(/\D/g,''))||0) > 0);
+}
+
+// ── UI HELPERS ────────────────────────────────────────
+function mesaLabel() {
+  return mesa === 'llevar' ? 'Para llevar' : `Mesa ${mesa.replace('mesa_','')}`;
+}
+function updateCartUI() {
+  const n = cartCount();
+  document.getElementById('cart-pill').textContent = n;
+  const btn = document.getElementById('btn-ver');
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Ver resumen · 0 items' : `Ver resumen · ${n} item${n!==1?'s':''}`;
+}
+function toast(msg, ms=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+}
+
+// ── SCREEN: MESAS ─────────────────────────────────────
+function renderMesas() {
+  let h = '';
+  for (let i = 1; i <= NUM_MESAS; i++) {
+    h += `<div class="mesa-btn" data-mesa="mesa_${i}">
+      <div class="mesa-num">${i}</div>
+      <div class="mesa-lbl">Mesa</div>
+    </div>`;
+  }
+  h += `<div class="mesa-btn llevar" data-mesa="llevar">
+    <span style="font-size:1.2rem">🛍️</span>
+    <div class="llevar-lbl">Para llevar</div>
+  </div>`;
+  document.getElementById('mesa-grid').innerHTML = h;
+}
+
+document.getElementById('mesa-grid').addEventListener('click', e => {
+  const btn = e.target.closest('[data-mesa]');
+  if (!btn) return;
+  mesa = btn.dataset.mesa;
+  cartLoad();
+  pageIdx = 0;
+  document.getElementById('hdr-mesa').textContent = mesaLabel();
+  document.getElementById('hdr-resumen-mesa').textContent = mesaLabel();
+  renderMenu();
+  showScreen('menu');
+});
+
+// ── SCREEN: MENU ──────────────────────────────────────
+function renderMenu() {
+  renderPageTabs();
+  renderMenuContent();
+  updateCartUI();
+}
+
+function renderPageTabs() {
+  const m = getMenu();
+  document.getElementById('page-tabs').innerHTML = m.map((p,i) =>
+    `<div class="p-tab${i===pageIdx?' active':''}" data-pg="${i}">${p.titulo}</div>`
+  ).join('');
+}
+
+document.getElementById('page-tabs').addEventListener('click', e => {
+  const t = e.target.closest('[data-pg]');
+  if (!t) return;
+  pageIdx = +t.dataset.pg;
+  renderPageTabs();
+  renderMenuContent();
+  document.getElementById('menu-scroll').scrollTop = 0;
+});
+
+function renderMenuContent() {
+  const m = getMenu();
+  const page = m[pageIdx];
+  itemsMap = {};
+  let h = '';
+  page.secciones.forEach((sec, si) => {
+    h += `<div class="sec-hdr">
+      <span>${sec.emoji}</span>
+      <span class="sec-title">${sec.titulo}</span>
+      ${sec.nota ? `<span class="sec-nota">${sec.nota}</span>` : ''}
+    </div>`;
+    sec.items.forEach((item, ii) => {
+      const id = `p${pageIdx}s${si}i${ii}`;
+      itemsMap[id] = item;
+      const inCart = cart.find(c => c.id === id);
+      const qty = inCart ? inCart.qty : 0;
+      const showPrecio = item.precio && item.precio !== '$0';
+      h += `<div class="m-item">
+        <div class="m-info">
+          <div class="m-nombre">${esc(item.nombre)}</div>
+          ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
+        </div>
+        ${showPrecio ? `<div class="m-precio">${esc(item.precio)}</div>` : ''}
+        <div class="qty-wrap">
+          ${qty > 0 ? `<button class="q-btn" data-rm="${id}">−</button>
+            <span class="q-num">${qty}</span>` : ''}
+          <button class="q-btn" data-add="${id}">+</button>
+        </div>
+      </div>`;
+    });
+  });
+  document.getElementById('menu-scroll').innerHTML = h;
+}
+
+document.getElementById('menu-scroll').addEventListener('click', e => {
+  const add = e.target.closest('[data-add]');
+  const rm  = e.target.closest('[data-rm]');
+  if (add) { addItem(add.dataset.add); renderMenuContent(); }
+  if (rm)  { removeItem(rm.dataset.rm);  renderMenuContent(); }
+});
+
+// ── SCREEN: RESUMEN ───────────────────────────────────
+function renderResumen() {
+  document.getElementById('hdr-resumen-mesa').textContent = mesaLabel();
+  document.getElementById('fallback').style.display = 'none';
+  let h = '';
+  cart.forEach(item => {
+    const showP = item.precio && item.precio !== '$0';
+    h += `<div class="r-item">
+      <div class="r-qty">×${item.qty}</div>
+      <div class="r-nombre">${esc(item.nombre)}</div>
+      ${showP ? `<div class="r-precio">${esc(item.precio)}</div>` : ''}
+    </div>`;
+  });
+  if (hasRealPrices()) {
+    const t = cartTotal();
+    h += `<div class="r-total">
+      <span class="r-total-lbl">Total estimado</span>
+      <span class="r-total-val">$${t.toLocaleString('es-AR')}</span>
+    </div>`;
+  }
+  document.getElementById('resumen-scroll').innerHTML = h;
+}
+
+// ── SEND ──────────────────────────────────────────────
+function buildMsg() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  let msg = `*${mesaLabel()} — ${hh}:${mm}*\n`;
+  cart.forEach(item => {
+    const p = (item.precio && item.precio !== '$0') ? ` — ${item.precio}` : '';
+    msg += `• ${item.qty}× ${item.nombre}${p}\n`;
+  });
+  if (hasRealPrices()) {
+    const t = cartTotal();
+    msg += `*Total: $${t.toLocaleString('es-AR')}*`;
+  }
+  return msg.trim();
+}
+
+document.getElementById('btn-enviar').addEventListener('click', () => {
+  const msg = buildMsg();
+  const url = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
+
+  // Open WhatsApp
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+  // Clear order immediately (decision 3A — no estado stale)
+  cartClear();
+
+  // Show fallback in case WA didn't open
+  const fb = document.getElementById('fallback');
+  document.getElementById('fallback-txt').value = msg;
+  fb.style.display = 'block';
+
+  toast('¡Pedido enviado! ✓');
+
+  // Return to mesas after 2.5s
+  setTimeout(() => {
+    showScreen('mesas');
+    renderMesas();
+  }, 2500);
+});
+
+document.getElementById('btn-copiar').addEventListener('click', async () => {
+  const txt = document.getElementById('fallback-txt').value;
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('Copiado al portapapeles ✓');
+  } catch(e) {
+    // Fallback: select textarea
+    const ta = document.getElementById('fallback-txt');
+    ta.select(); ta.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); toast('Texto copiado ✓'); }
+    catch(e2) { toast('Seleccioná el texto y copialo manualmente'); }
+  }
+});
+
+// ── NAV BUTTONS ───────────────────────────────────────
+document.getElementById('back-mesas').addEventListener('click', () => {
+  showScreen('mesas'); mesa = null; cart = [];
+  renderMesas();
+});
+document.getElementById('back-menu').addEventListener('click', () => {
+  renderMenu(); showScreen('menu');
+});
+document.getElementById('btn-ver').addEventListener('click', () => {
+  renderResumen(); showScreen('resumen');
+});
+
+// ── UTILS ─────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INIT ──────────────────────────────────────────────
+renderMesas();
+showScreen('mesas');
+</script>
+</body>
+</html>
