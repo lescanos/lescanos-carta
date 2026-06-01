@@ -1,0 +1,4 @@
+# Agent / gstack local tooling
+.agents/
+.gstack/
+skills-lock.json
