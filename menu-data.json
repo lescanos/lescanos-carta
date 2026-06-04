@@ -11,17 +11,17 @@
           {
             "nombre": "Elmer Fudd",
             "desc": "Mayonesa, medallón 120g, queso, lechuga, tomate",
-            "precio": "2000"
+            "precio": "#2000"
           },
           {
             "nombre": "Tweety",
             "desc": "Kétchup, cebolla caramelizada, medallón 120g, panceta, cheddar",
-            "precio": "$0"
+            "precio": "$3200"
           },
           {
             "nombre": "Marvin",
             "desc": "Mostaza, guacamole, pepinillo, cheddar, dos medallones 120g",
-            "precio": "$0"
+            "precio": "$5000"
           },
           {
             "nombre": "Lescano",
