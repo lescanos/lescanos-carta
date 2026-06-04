@@ -21,8 +21,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
 #carta-view{position:fixed;inset:0;z-index:1;}
 .carousel{display:flex;width:100%;height:100vh;overflow-x:scroll;scroll-snap-type:x mandatory;scrollbar-width:none;}
 .carousel::-webkit-scrollbar{display:none;}
-/* width:100vw (no min-width) impide que el contenido crezca el slide más allá del viewport */
-.slide{width:100vw;height:100vh;display:flex;overflow:hidden;scroll-snap-align:start;flex-shrink:0;}
+/* width+min-width:0 impiden que el contenido flexbox crezca el slide más allá del viewport */
+.slide{width:100vw;min-width:0;height:100vh;display:flex;overflow:hidden;scroll-snap-align:start;flex-shrink:0;}
 .left{width:36%;min-width:36%;height:100%;background:var(--dark);display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:1.2rem .8rem;position:relative;flex-shrink:0;}
 .left::after{content:'';position:absolute;right:0;top:0;width:3px;height:100%;background:var(--gold);}
