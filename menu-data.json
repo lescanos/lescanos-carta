@@ -37,6 +37,11 @@
             "nombre": "Taz",
             "desc": "Mostaza, tres medallones 120g, cheddar, panceta, cebolla morada, lechuga, tomate",
             "precio": "$0"
+          },
+          {
+            "nombre": "Nuevo producto de Prueba",
+            "desc": "Descripción",
+            "precio": "$5000"
           }
         ]
       }
