@@ -216,13 +216,14 @@ async function pushToGitHub(data){
   const headers={'Authorization':'Bearer '+MENU_TOKEN,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
   try{
     const getRes=await fetch(url,{headers});
-    if(!getRes.ok)return false;
+    if(!getRes.ok){console.error('GitHub GET falló:',getRes.status,await getRes.text());return getRes.status;}
     const {sha}=await getRes.json();
     const bytes=new TextEncoder().encode(JSON.stringify(data,null,2));
     let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));
     const putRes=await fetch(url,{method:'PUT',headers,body:JSON.stringify({message:'chore: update menu',content:btoa(bin),sha})});
-    return putRes.ok;
-  }catch(e){return false;}
+    if(!putRes.ok){console.error('GitHub PUT falló:',putRes.status,await putRes.text());return putRes.status;}
+    return true;
+  }catch(e){console.error('GitHub error:',e);return false;}
 }
 let CARTA=JSON.parse(JSON.stringify(DEFAULT_CARTA));
 
@@ -408,8 +409,10 @@ async function saveAndApply(){
   const t=document.getElementById('save-toast');
   t.textContent='⏳ Publicando...';
   t.classList.add('show');
-  const ok=await pushToGitHub(CARTA);
-  t.textContent=ok?'✓ Publicado — visible en ~2 min':'⚠ Sin conexión a GitHub';
+  const result=await pushToGitHub(CARTA);
+  const ok=result===true;
+  const statusMsg=result===401?'⚠ Token inválido (401)':result===403?'⚠ Sin permiso (403)':result===404?'⚠ Repo no encontrado (404)':'⚠ Error GitHub ('+result+')';
+  t.textContent=ok?'✓ Publicado — visible en ~2 min':statusMsg;
   setTimeout(()=>{t.classList.remove('show');setTimeout(()=>{t.textContent='✓ Cambios guardados';},300);},3500);
 }
 
