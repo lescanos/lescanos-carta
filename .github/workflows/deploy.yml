@@ -34,6 +34,7 @@ jobs:
           ADMIN_PWD: ${{ secrets.ADMIN_PWD }}
           WA_NUMBER: ${{ secrets.WA_NUMBER }}
           NUM_MESAS: ${{ secrets.NUM_MESAS }}
+          MENU_TOKEN: ${{ secrets.MENU_TOKEN }}
         run: python3 .github/inject.py
 
       - name: Upload to Pages
