@@ -133,6 +133,26 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
   font-weight:700;font-size:.75rem;padding:.45rem 1.1rem;border-radius:20px;z-index:200;
   opacity:0;transition:opacity .3s;pointer-events:none;letter-spacing:.05em;}
 .save-toast.show{opacity:1;}
+
+/* ── PRICE INPUT ── */
+.price-wrap{display:flex;align-items:center;gap:2px;}
+.price-prefix{color:var(--gold);font-weight:700;font-size:.85rem;flex-shrink:0;}
+
+/* ── HUB VIEW ── */
+#hub-view{position:fixed;inset:0;z-index:100;background:#0E0E0E;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:2rem;}
+#hub-view.active{display:flex;}
+.hub-brand{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;color:var(--gold);}
+.hub-sub{font-size:.62rem;color:var(--gray);letter-spacing:.2em;}
+.hub-grid{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;width:100%;max-width:480px;margin-top:.5rem;}
+.hub-card{background:#1A1A1A;border:1.5px solid rgba(201,168,76,.2);border-radius:14px;
+  padding:1.8rem 1.2rem;cursor:pointer;flex:1;min-width:130px;text-align:center;
+  transition:border-color .2s,background .2s;}
+.hub-card:hover,.hub-card:active{border-color:var(--gold);background:#222;}
+.hub-icon{font-size:2rem;margin-bottom:.6rem;}
+.hub-card-label{font-size:.78rem;font-weight:700;color:#fff;letter-spacing:.04em;margin-bottom:.25rem;}
+.hub-card-desc{font-size:.6rem;color:var(--gray);line-height:1.4;}
+.hub-exit{font-size:.62rem;color:var(--gray);cursor:pointer;text-decoration:underline;margin-top:.5rem;}
 </style>
 </head>
 <body>
@@ -158,13 +178,32 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
   <span class="back-btn-login" onclick="showCarta()">← volver a la carta</span>
 </div>
 
+<!-- ═══════ HUB VIEW ═══════ -->
+<div id="hub-view">
+  <div class="hub-brand">LESCANO'S</div>
+  <div class="hub-sub">PANEL DE ADMINISTRACIÓN</div>
+  <div class="hub-grid">
+    <div class="hub-card" onclick="showAdmin()">
+      <div class="hub-icon">💰</div>
+      <div class="hub-card-label">Gestión de Precios</div>
+      <div class="hub-card-desc">Actualizar precios y productos del menú</div>
+    </div>
+    <div class="hub-card" onclick="goToMesas()">
+      <div class="hub-icon">🍽️</div>
+      <div class="hub-card-label">Servicio de Mesas</div>
+      <div class="hub-card-desc">Gestionar pedidos y mesas del local</div>
+    </div>
+  </div>
+  <span class="hub-exit" onclick="exitAdmin()">← Volver a la carta</span>
+</div>
+
 <!-- ═══════ ADMIN VIEW ═══════ -->
 <div id="admin-view">
   <div class="admin-topbar">
     <div class="admin-title">Panel Admin <span>Lescano's</span></div>
     <div class="topbar-actions">
       <button class="btn-save" onclick="saveAndApply()">💾 Guardar</button>
-      <button class="btn-exit" onclick="showCarta()">✕ Salir</button>
+      <button class="btn-exit" onclick="showHub()">← Hub</button>
     </div>
   </div>
   <div class="admin-body" id="admin-body"></div>
@@ -320,6 +359,7 @@ function showCarta(){
   document.getElementById('carta-view').style.display='block';
   document.getElementById('login-view').classList.remove('active');
   document.getElementById('admin-view').classList.remove('active');
+  document.getElementById('hub-view').classList.remove('active');
   document.body.style.overflow='hidden';
 }
 function showLogin(){
@@ -332,17 +372,32 @@ function showLogin(){
 function checkLogin(){
   const v=document.getElementById('pwd-input').value;
   if(v===ADMIN_PASS){
+    sessionStorage.setItem('admin_auth','1');
     document.getElementById('login-view').classList.remove('active');
-    showAdmin();
+    showHub();
   }else{
     document.getElementById('login-error').classList.add('show');
     document.getElementById('pwd-input').value='';
   }
 }
+function showHub(){
+  document.getElementById('hub-view').classList.add('active');
+  document.getElementById('admin-view').classList.remove('active');
+  document.getElementById('carta-view').style.display='none';
+}
 function showAdmin(){
   document.getElementById('admin-view').classList.add('active');
+  document.getElementById('hub-view').classList.remove('active');
   document.getElementById('carta-view').style.display='none';
   renderAdmin();
+}
+function exitAdmin(){
+  sessionStorage.removeItem('admin_auth');
+  showCarta();
+}
+function goToMesas(){
+  sessionStorage.setItem('admin_auth','1');
+  window.location.href='./litzy.html';
 }
 
 // ═══════════════════════════════════════════════════
@@ -377,8 +432,11 @@ function renderAdmin(){
                 </div>
                 <div class="admin-item-row">
                   <label>Precio</label>
-                  <input type="text" class="input-price" value="${escHtml(item.precio)}"
-                    placeholder="$0" oninput="updateField(${pi},${si},${ii},'precio',this.value)">
+                  <div class="price-wrap">
+                    <span class="price-prefix">$</span>
+                    <input type="text" class="input-price" value="${escHtml(item.precio.replace(/^\$/,''))}"
+                      placeholder="0" oninput="updateField(${pi},${si},${ii},'precio','$'+this.value.replace(/^\$/,''))">
+                  </div>
                 </div>
               </div>`).join('')}
           </div>
@@ -419,7 +477,11 @@ async function saveAndApply(){
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-(async()=>{CARTA=await loadCarta();renderCarta();showCarta();})();
+(async()=>{
+  CARTA=await loadCarta();
+  renderCarta();
+  sessionStorage.getItem('admin_auth')?showHub():showCarta();
+})();
 </script>
 </body>
 </html>
