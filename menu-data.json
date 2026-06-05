@@ -492,6 +492,10 @@
       {
         "nombre": "Pizza de Muzza + Carlito Común + Cono de Papas",
         "precio": "$24.000"
+      },
+      {
+        "nombre": "Nueva promo",
+        "precio": "$28888"
       }
     ]
   }
