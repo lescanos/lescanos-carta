@@ -252,19 +252,34 @@
         "nota": "",
         "items": [
           {
-            "nombre": "Papas fritas",
-            "desc": "Porción individual",
+            "nombre": "Bandeja de papa fritas",
+            "desc": "",
             "precio": "$7000"
           },
           {
-            "nombre": "Papas fritas cheddar y panceta",
-            "desc": "Porción individual",
+            "nombre": "Bandeja de papa fritas cheddar y panceta",
+            "desc": "",
             "precio": "$10.000"
           },
           {
-            "nombre": "Como de papas ",
+            "nombre": "Cono de papas ",
             "desc": "",
             "precio": "$5.000"
+          },
+          {
+            "nombre": "Tortilla clásica ",
+            "desc": "",
+            "precio": "$10.000"
+          },
+          {
+            "nombre": "Tortilla rellena ",
+            "desc": "Rellena de jamón y queso ",
+            "precio": "$13.000"
+          },
+          {
+            "nombre": "Tortilla lescano",
+            "desc": "Rellena de milanesa, cheddar y panceta ",
+            "precio": "$17.000"
           }
         ]
       },
