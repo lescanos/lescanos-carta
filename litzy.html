@@ -267,7 +267,8 @@ function cartClear() { localStorage.removeItem(lsKey()); cart = []; }
 function addItem(id) {
   const item = itemsMap[id]; if (!item) return;
   const e = cart.find(c => c.id === id);
-  e ? e.qty++ : cart.push({id, nombre:item.nombre, precio:item.precio, qty:1, pagina:item.pagina, seccion:item.seccion});
+  const precio=item.precio||(item.precios&&item.precios[0])||'$0';
+  e ? e.qty++ : cart.push({id, nombre:item.nombre, precio, qty:1, pagina:item.pagina, seccion:item.seccion});
   cartSave(); updateCartUI();
 }
 function removeItem(id) {
@@ -341,9 +342,11 @@ function renderMenu() {
 
 function renderPageTabs() {
   const m = getMenu();
-  document.getElementById('page-tabs').innerHTML = m.map((p,i) =>
-    `<div class="p-tab${i===pageIdx?' active':''}" data-pg="${i}">${p.titulo}</div>`
-  ).join('');
+  document.getElementById('page-tabs').innerHTML = m
+    .map((p,i)=>({p,i}))
+    .filter(({p})=>p.tipo!=='promos')
+    .map(({p,i})=>`<div class="p-tab${i===pageIdx?' active':''}" data-pg="${i}">${p.titulo}</div>`)
+    .join('');
 }
 
 document.getElementById('page-tabs').addEventListener('click', e => {
@@ -371,13 +374,14 @@ function renderMenuContent() {
       itemsMap[id] = {...item, pagina:page.titulo, seccion:sec.titulo};
       const inCart = cart.find(c => c.id === id);
       const qty = inCart ? inCart.qty : 0;
-      const showPrecio = item.precio && item.precio !== '$0';
+      const _p=item.precio||(item.precios&&item.precios[0])||'$0';
+      const showPrecio = _p && _p !== '$0';
       h += `<div class="m-item">
         <div class="m-info">
           <div class="m-nombre">${esc(item.nombre)}</div>
           ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
         </div>
-        ${showPrecio ? `<div class="m-precio">${esc(item.precio)}</div>` : ''}
+        ${showPrecio ? `<div class="m-precio">${esc(_p)}</div>` : ''}
         <div class="qty-wrap">
           ${qty > 0 ? `<button class="q-btn" data-rm="${id}">−</button>
             <span class="q-num">${qty}</span>` : ''}

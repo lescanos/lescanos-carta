@@ -6,13 +6,14 @@ const DEFAULT_CARTA = [
     secciones:[{
       emoji:"🍔", titulo:"HAMBURGUESAS",
       nota:"Con papas y gaseosa de vidrio",
+      columnas:["Solo","Con papas"],
       items:[
-        {nombre:"Elmer Fudd",     desc:"Mayonesa, medallón 120g, queso, lechuga, tomate",                                   precio:"$0"},
-        {nombre:"Tweety",         desc:"Kétchup, cebolla caramelizada, medallón 120g, panceta, cheddar",                    precio:"$0"},
-        {nombre:"Marvin",         desc:"Mostaza, guacamole, pepinillo, cheddar, dos medallones 120g",                       precio:"$0"},
-        {nombre:"Lescano",        desc:"Mayonesa, dos medallones 120g, jamón, queso, huevo frito, panceta (papas cheddar)", precio:"$0"},
-        {nombre:"Porky",          desc:"Kétchup, cebolla, dos medallones 120g, cheddar, panceta, bañada en cheddar",        precio:"$0"},
-        {nombre:"Taz",            desc:"Mostaza, tres medallones 120g, cheddar, panceta, cebolla morada, lechuga, tomate",  precio:"$0"},
+        {nombre:"Elmer Fudd",     desc:"Mayonesa, medallón 120g, queso, lechuga, tomate",                                   precios:["$0","$0"]},
+        {nombre:"Tweety",         desc:"Kétchup, cebolla caramelizada, medallón 120g, panceta, cheddar",                    precios:["$0","$0"]},
+        {nombre:"Marvin",         desc:"Mostaza, guacamole, pepinillo, cheddar, dos medallones 120g",                       precios:["$0","$0"]},
+        {nombre:"Lescano",        desc:"Mayonesa, dos medallones 120g, jamón, queso, huevo frito, panceta (papas cheddar)", precios:["$0","$0"]},
+        {nombre:"Porky",          desc:"Kétchup, cebolla, dos medallones 120g, cheddar, panceta, bañada en cheddar",        precios:["$0","$0"]},
+        {nombre:"Taz",            desc:"Mostaza, tres medallones 120g, cheddar, panceta, cebolla morada, lechuga, tomate",  precios:["$0","$0"]},
       ]
     }]
   },
@@ -22,20 +23,22 @@ const DEFAULT_CARTA = [
       {
         emoji:"🌭", titulo:"PANCHOS",
         nota:"Solo o con papas",
+        columnas:["Solo","Con papas"],
         items:[
-          {nombre:"Lola Bunny", desc:"Mayonesa, kétchup, papitas",                         precio:"$0"},
-          {nombre:"Bugs Bunny", desc:"Cebolla caramelizada, papitas, mostaza, queso",       precio:"$0"},
-          {nombre:"Lucas",      desc:"Mayonesa, cheddar, jamón, queso, huevo, papitas",     precio:"$0"},
+          {nombre:"Lola Bunny", desc:"Mayonesa, kétchup, papitas",                         precios:["$0","$0"]},
+          {nombre:"Bugs Bunny", desc:"Cebolla caramelizada, papitas, mostaza, queso",       precios:["$0","$0"]},
+          {nombre:"Lucas",      desc:"Mayonesa, cheddar, jamón, queso, huevo, papitas",     precios:["$0","$0"]},
         ]
       },
       {
         emoji:"🥩", titulo:"MILANESAS / SUPREMAS",
         nota:"Con papas",
+        columnas:["Solo","Con papas"],
         items:[
-          {nombre:"Abuelita",   desc:"Mayonesa, mostaza, lechuga, tomate",                              precio:"$0"},
-          {nombre:"San Bigotes",desc:"Kétchup, cebolla caramelizada, queso, tomate",                    precio:"$0"},
-          {nombre:"Silvestre",  desc:"Mayonesa, cebolla con ají, jamón, queso, huevo, lechuga, tomate", precio:"$0"},
-          {nombre:"Lescano",    desc:"Mayonesa, cheddar, huevo, jamón, queso, panceta",                 precio:"$0"},
+          {nombre:"Abuelita",   desc:"Mayonesa, mostaza, lechuga, tomate",                              precios:["$0","$0"]},
+          {nombre:"San Bigotes",desc:"Kétchup, cebolla caramelizada, queso, tomate",                    precios:["$0","$0"]},
+          {nombre:"Silvestre",  desc:"Mayonesa, cebolla con ají, jamón, queso, huevo, lechuga, tomate", precios:["$0","$0"]},
+          {nombre:"Lescano",    desc:"Mayonesa, cheddar, huevo, jamón, queso, panceta",                 precios:["$0","$0"]},
         ]
       }
     ]
@@ -46,26 +49,28 @@ const DEFAULT_CARTA = [
       {
         emoji:"🍕", titulo:"PIZZAS",
         nota:"Media o entera",
+        columnas:["Media","Entera"],
         items:[
-          {nombre:"Común",      desc:"Salsa, muzzarella, aceitunas",                                                precio:"$0"},
-          {nombre:"Especial",   desc:"Salsa, jamón, muzzarella, morrón, huevo duro, aceitunas",                     precio:"$0"},
-          {nombre:"Roquefort",  desc:"Salsa, muzzarella, roquefort",                                                precio:"$0"},
-          {nombre:"Napolitana", desc:"Salsa, muzzarella, orégano, ajo, tomate",                                     precio:"$0"},
-          {nombre:"Cantimpalo", desc:"Salsa, muzzarella, cantimpalo",                                               precio:"$0"},
-          {nombre:"Fugazza",    desc:"Salsa, cebolla, muzzarella",                                                  precio:"$0"},
-          {nombre:"Anchoas",    desc:"Salsa, muzzarella, anchoas",                                                  precio:"$0"},
-          {nombre:"Pollo",      desc:"Salsa, pollo con salsa blanca, muzzarella",                                   precio:"$0"},
-          {nombre:"Lescano",    desc:"Salsa, pollo con salsa blanca, jamón, muzzarella, huevo frito, panceta, cheddar", precio:"$0"},
+          {nombre:"Común",      desc:"Salsa, muzzarella, aceitunas",                                                precios:["$0","$0"]},
+          {nombre:"Especial",   desc:"Salsa, jamón, muzzarella, morrón, huevo duro, aceitunas",                     precios:["$0","$0"]},
+          {nombre:"Roquefort",  desc:"Salsa, muzzarella, roquefort",                                                precios:["$0","$0"]},
+          {nombre:"Napolitana", desc:"Salsa, muzzarella, orégano, ajo, tomate",                                     precios:["$0","$0"]},
+          {nombre:"Cantimpalo", desc:"Salsa, muzzarella, cantimpalo",                                               precios:["$0","$0"]},
+          {nombre:"Fugazza",    desc:"Salsa, cebolla, muzzarella",                                                  precios:["$0","$0"]},
+          {nombre:"Anchoas",    desc:"Salsa, muzzarella, anchoas",                                                  precios:["$0","$0"]},
+          {nombre:"Pollo",      desc:"Salsa, pollo con salsa blanca, muzzarella",                                   precios:["$0","$0"]},
+          {nombre:"Lescano",    desc:"Salsa, pollo con salsa blanca, jamón, muzzarella, huevo frito, panceta, cheddar", precios:["$0","$0"]},
         ]
       },
       {
         emoji:"🍕", titulo:"PIZZANESAS",
         nota:"Con papas fritas",
+        columnas:["1 pers","2 pers","3 pers"],
         items:[
-          {nombre:"Común",      desc:"Salsa, muzzarella, aceitunas",                          precio:"$0"},
-          {nombre:"Napolitana", desc:"Salsa, jamón, muzzarella, tomate, orégano, ajo",         precio:"$0"},
-          {nombre:"Roquefort",  desc:"Salsa, muzzarella, roquefort",                           precio:"$0"},
-          {nombre:"Lescano",    desc:"Salsa, jamón, muzzarella, huevo frito, panceta, cheddar",precio:"$0"},
+          {nombre:"Común",      desc:"Salsa, muzzarella, aceitunas",                          precios:["$0","$0","$0"]},
+          {nombre:"Napolitana", desc:"Salsa, jamón, muzzarella, tomate, orégano, ajo",         precios:["$0","$0","$0"]},
+          {nombre:"Roquefort",  desc:"Salsa, muzzarella, roquefort",                           precios:["$0","$0","$0"]},
+          {nombre:"Lescano",    desc:"Salsa, jamón, muzzarella, huevo frito, panceta, cheddar",precios:["$0","$0","$0"]},
         ]
       }
     ]
@@ -136,6 +141,17 @@ const DEFAULT_CARTA = [
           {nombre:"Amargo obrero",             desc:"",precio:"$0"},
         ]
       }
+    ]
+  },
+  {
+    pagina:"6", titulo:"Promos",
+    tipo:"promos",
+    subtitulo:"Viernes, Sábado y Domingo",
+    secciones:[],
+    items:[
+      {nombre:"Pizza Especial + Pizza de Muzza",                       precio:"$25.000"},
+      {nombre:"Dos Pizzas de Muzza",                                   precio:"$22.000"},
+      {nombre:"Pizza de Muzza + Carlito Común + Cono de Papas",        precio:"$24.000"},
     ]
   }
 ];
