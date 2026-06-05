@@ -186,6 +186,10 @@
     .vp-btn:disabled{opacity:.2;cursor:default;}
     .vp-num{font-size:.9rem;font-weight:700;color:#fff;min-width:18px;text-align:center;}
     .m-var-badge{font-size:.75rem;font-weight:700;color:var(--gold);min-width:20px;text-align:center;}
+    .m-price-table{display:flex;gap:.3rem;flex-shrink:0;align-items:flex-end;}
+    .m-price-col{display:flex;flex-direction:column;align-items:center;min-width:44px;}
+    .m-price-col-lbl{font-size:.48rem;color:var(--gray);white-space:nowrap;text-align:center;line-height:1.2;letter-spacing:.03em;}
+    .m-price-col-val{font-family:'Playfair Display',serif;font-size:.78rem;color:var(--gold);font-weight:700;white-space:nowrap;text-align:center;}
     .r-rm{background:transparent;border:none;color:rgba(255,80,80,.45);font-size:1.1rem;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1;}
     .r-rm:active{color:rgba(255,80,80,.9);}
 
@@ -425,13 +429,16 @@ function renderMenuContent() {
         if (sec.columnas) {
           itemsMap[baseId] = {...item, pagina:page.titulo, seccion:sec.titulo, _columnas:sec.columnas};
           const totalQty = cart.filter(c => c.id.startsWith(baseId+'-c')).reduce((s,c)=>s+c.qty,0);
-          const refP = item.precios && item.precios.find(p=>p&&p!=='$0');
+          const priceTableHTML = `<div class="m-price-table">${sec.columnas.map((col,ci)=>{
+            const p=(item.precios&&item.precios[ci])||'$0';
+            return `<div class="m-price-col"><div class="m-price-col-lbl">${esc(col)}</div><div class="m-price-col-val">${esc(p)}</div></div>`;
+          }).join('')}</div>`;
           h += `<div class="m-item">
             <div class="m-info">
               <div class="m-nombre">${esc(item.nombre)}</div>
               ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
             </div>
-            ${refP ? `<div class="m-precio" style="font-size:.7rem;">${esc(refP)}+</div>` : ''}
+            ${priceTableHTML}
             <div class="qty-wrap">
               ${totalQty > 0 ? `<span class="m-var-badge">${totalQty}×</span>` : ''}
               <button class="q-btn" data-vp="${baseId}">+</button>
