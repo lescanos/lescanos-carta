@@ -17,7 +17,7 @@
             "desc": "Mayonesa, medallón 120g, queso, lechuga, tomate",
             "precios": [
               "$14.000",
-              "$16.000"
+              "$0"
             ]
           },
           {
@@ -492,10 +492,6 @@
       {
         "nombre": "Pizza de Muzza + Carlito Común + Cono de Papas",
         "precio": "$24.000"
-      },
-      {
-        "nombre": "Nueva promo",
-        "precio": "$28888"
       }
     ]
   }
