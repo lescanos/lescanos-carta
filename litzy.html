@@ -169,6 +169,26 @@
     }
     .btn-copiar:active{background:rgba(201,168,76,.1);}
 
+    /* ── VARIANT PICKER ── */
+    .vp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;display:none;align-items:flex-end;}
+    .vp-overlay.show{display:flex;}
+    .vp-sheet{width:100%;background:#1C1C1C;border-radius:18px 18px 0 0;border-top:1px solid rgba(201,168,76,.25);padding:8px 0 32px;}
+    .vp-handle{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:0 auto 14px;}
+    .vp-item-name{font-size:.9rem;font-weight:700;color:#fff;padding:0 20px 4px;text-align:center;}
+    .vp-title{font-size:.6rem;color:var(--gray);letter-spacing:.14em;text-align:center;padding:0 20px 10px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px;}
+    .vp-options{padding:4px 12px;}
+    .vp-option{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;margin:5px 0;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.12);}
+    .vp-col-name{flex:1;font-size:.9rem;font-weight:700;color:#fff;}
+    .vp-col-price{font-family:'Playfair Display',serif;font-size:.82rem;color:var(--gold);white-space:nowrap;min-width:52px;text-align:right;}
+    .vp-qty-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+    .vp-btn{width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(201,168,76,.45);background:transparent;color:var(--gold);font-size:1.25rem;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;line-height:1;}
+    .vp-btn:active{background:rgba(201,168,76,.15);}
+    .vp-btn:disabled{opacity:.2;cursor:default;}
+    .vp-num{font-size:.9rem;font-weight:700;color:#fff;min-width:18px;text-align:center;}
+    .m-var-badge{font-size:.75rem;font-weight:700;color:var(--gold);min-width:20px;text-align:center;}
+    .r-rm{background:transparent;border:none;color:rgba(255,80,80,.45);font-size:1.1rem;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1;}
+    .r-rm:active{color:rgba(255,80,80,.9);}
+
     /* ── TOAST ── */
     .toast{
       position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
@@ -229,6 +249,17 @@
   </div>
 
 </div>
+
+<!-- ── VARIANT PICKER ── -->
+<div class="vp-overlay" id="vp-overlay">
+  <div class="vp-sheet">
+    <div class="vp-handle"></div>
+    <div class="vp-item-name" id="vp-name"></div>
+    <div class="vp-title">¿CÓMO LO QUIERE?</div>
+    <div class="vp-options" id="vp-options"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -343,9 +374,7 @@ function renderMenu() {
 function renderPageTabs() {
   const m = getMenu();
   document.getElementById('page-tabs').innerHTML = m
-    .map((p,i)=>({p,i}))
-    .filter(({p})=>p.tipo!=='promos')
-    .map(({p,i})=>`<div class="p-tab${i===pageIdx?' active':''}" data-pg="${i}">${p.titulo}</div>`)
+    .map((p,i)=>`<div class="p-tab${i===pageIdx?' active':''}" data-pg="${i}">${p.titulo}</div>`)
     .join('');
 }
 
@@ -363,54 +392,160 @@ function renderMenuContent() {
   const page = m[pageIdx];
   itemsMap = {};
   let h = '';
-  page.secciones.forEach((sec, si) => {
+
+  if (page.tipo === 'promos') {
     h += `<div class="sec-hdr">
-      <span>${sec.emoji}</span>
-      <span class="sec-title">${sec.titulo}</span>
-      ${sec.nota ? `<span class="sec-nota">${sec.nota}</span>` : ''}
+      <span>🎉</span>
+      <span class="sec-title">${page.subtitulo||'PROMOS'}</span>
     </div>`;
-    sec.items.forEach((item, ii) => {
-      const id = `p${pageIdx}s${si}i${ii}`;
-      itemsMap[id] = {...item, pagina:page.titulo, seccion:sec.titulo};
+    (page.items||[]).forEach((item, ii) => {
+      const id = `promo-${pageIdx}-${ii}`;
+      itemsMap[id] = {...item, pagina:page.titulo, seccion:''};
       const inCart = cart.find(c => c.id === id);
       const qty = inCart ? inCart.qty : 0;
-      const _p=item.precio||(item.precios&&item.precios[0])||'$0';
-      const showPrecio = _p && _p !== '$0';
+      const showP = item.precio && item.precio !== '$0';
       h += `<div class="m-item">
-        <div class="m-info">
-          <div class="m-nombre">${esc(item.nombre)}</div>
-          ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
-        </div>
-        ${showPrecio ? `<div class="m-precio">${esc(_p)}</div>` : ''}
+        <div class="m-info"><div class="m-nombre">${esc(item.nombre)}</div></div>
+        ${showP ? `<div class="m-precio">${esc(item.precio)}</div>` : ''}
         <div class="qty-wrap">
-          ${qty > 0 ? `<button class="q-btn" data-rm="${id}">−</button>
-            <span class="q-num">${qty}</span>` : ''}
+          ${qty > 0 ? `<button class="q-btn" data-rm="${id}">−</button><span class="q-num">${qty}</span>` : ''}
           <button class="q-btn" data-add="${id}">+</button>
         </div>
       </div>`;
     });
-  });
+  } else {
+    page.secciones.forEach((sec, si) => {
+      h += `<div class="sec-hdr">
+        <span>${sec.emoji}</span>
+        <span class="sec-title">${sec.titulo}</span>
+        ${sec.nota ? `<span class="sec-nota">${sec.nota}</span>` : ''}
+      </div>`;
+      sec.items.forEach((item, ii) => {
+        const baseId = `p${pageIdx}s${si}i${ii}`;
+        if (sec.columnas) {
+          itemsMap[baseId] = {...item, pagina:page.titulo, seccion:sec.titulo, _columnas:sec.columnas};
+          const totalQty = cart.filter(c => c.id.startsWith(baseId+'-c')).reduce((s,c)=>s+c.qty,0);
+          const refP = item.precios && item.precios.find(p=>p&&p!=='$0');
+          h += `<div class="m-item">
+            <div class="m-info">
+              <div class="m-nombre">${esc(item.nombre)}</div>
+              ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
+            </div>
+            ${refP ? `<div class="m-precio" style="font-size:.7rem;">${esc(refP)}+</div>` : ''}
+            <div class="qty-wrap">
+              ${totalQty > 0 ? `<span class="m-var-badge">${totalQty}×</span>` : ''}
+              <button class="q-btn" data-vp="${baseId}">+</button>
+            </div>
+          </div>`;
+        } else {
+          itemsMap[baseId] = {...item, pagina:page.titulo, seccion:sec.titulo};
+          const inCart = cart.find(c => c.id === baseId);
+          const qty = inCart ? inCart.qty : 0;
+          const _p = item.precio||(item.precios&&item.precios[0])||'$0';
+          const showP = _p && _p !== '$0';
+          h += `<div class="m-item">
+            <div class="m-info">
+              <div class="m-nombre">${esc(item.nombre)}</div>
+              ${item.desc ? `<div class="m-desc">${esc(item.desc)}</div>` : ''}
+            </div>
+            ${showP ? `<div class="m-precio">${esc(_p)}</div>` : ''}
+            <div class="qty-wrap">
+              ${qty > 0 ? `<button class="q-btn" data-rm="${baseId}">−</button><span class="q-num">${qty}</span>` : ''}
+              <button class="q-btn" data-add="${baseId}">+</button>
+            </div>
+          </div>`;
+        }
+      });
+    });
+  }
   document.getElementById('menu-scroll').innerHTML = h;
 }
 
 document.getElementById('menu-scroll').addEventListener('click', e => {
   const add = e.target.closest('[data-add]');
   const rm  = e.target.closest('[data-rm]');
+  const vp  = e.target.closest('[data-vp]');
+  if (vp)  { showVariantPicker(vp.dataset.vp); return; }
   if (add) { addItem(add.dataset.add); renderMenuContent(); }
-  if (rm)  { removeItem(rm.dataset.rm);  renderMenuContent(); }
+  if (rm)  { removeItem(rm.dataset.rm); renderMenuContent(); }
 });
+
+// ── VARIANT PICKER ────────────────────────────────────
+let vpBaseId = null;
+
+function showVariantPicker(baseId) {
+  const item = itemsMap[baseId];
+  if (!item || !item._columnas) return;
+  vpBaseId = baseId;
+  document.getElementById('vp-name').textContent = item.nombre;
+  refreshVariantPicker();
+  document.getElementById('vp-overlay').classList.add('show');
+}
+
+function refreshVariantPicker() {
+  const item = itemsMap[vpBaseId]; if (!item) return;
+  const cols = item._columnas;
+  const precios = item.precios || [];
+  document.getElementById('vp-options').innerHTML = cols.map((col, ci) => {
+    const p = precios[ci] || '$0';
+    const showP = p && p !== '$0';
+    const varId = `${vpBaseId}-c${ci}`;
+    const qty = (cart.find(c => c.id === varId)||{qty:0}).qty;
+    return `<div class="vp-option">
+      <div class="vp-col-name">${esc(col)}</div>
+      ${showP ? `<div class="vp-col-price">${esc(p)}</div>` : '<div class="vp-col-price"></div>'}
+      <div class="vp-qty-wrap">
+        <button class="vp-btn" data-vrm="${ci}" ${qty===0?'disabled':''}>−</button>
+        <span class="vp-num">${qty}</span>
+        <button class="vp-btn" data-vadd="${ci}">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('vp-options').addEventListener('click', e => {
+  const addBtn = e.target.closest('[data-vadd]');
+  const rmBtn  = e.target.closest('[data-vrm]');
+  if (addBtn) { addVariant(vpBaseId, +addBtn.dataset.vadd); refreshVariantPicker(); updateCartUI(); }
+  if (rmBtn && !rmBtn.disabled) { removeVariant(vpBaseId, +rmBtn.dataset.vrm); refreshVariantPicker(); updateCartUI(); }
+});
+
+document.getElementById('vp-overlay').addEventListener('click', e => {
+  if (!e.target.closest('.vp-sheet')) {
+    document.getElementById('vp-overlay').classList.remove('show');
+    renderMenuContent();
+  }
+});
+
+function addVariant(baseId, colIdx) {
+  const item = itemsMap[baseId]; if (!item) return;
+  const id = `${baseId}-c${colIdx}`;
+  const col = item._columnas[colIdx];
+  const precio = (item.precios && item.precios[colIdx]) || '$0';
+  const nombre = `${item.nombre} (${col})`;
+  const e = cart.find(c => c.id === id);
+  e ? e.qty++ : cart.push({id, nombre, precio, qty:1, pagina:item.pagina, seccion:item.seccion});
+  cartSave();
+}
+function removeVariant(baseId, colIdx) {
+  const id = `${baseId}-c${colIdx}`;
+  const i = cart.findIndex(c => c.id === id); if (i === -1) return;
+  cart[i].qty > 1 ? cart[i].qty-- : cart.splice(i, 1);
+  cartSave();
+}
 
 // ── SCREEN: RESUMEN ───────────────────────────────────
 function renderResumen() {
   document.getElementById('hdr-resumen-mesa').textContent = mesaLabel();
   document.getElementById('fallback').style.display = 'none';
   let h = '';
-  cart.forEach(item => {
+  cart.forEach((item, idx) => {
     const showP = item.precio && item.precio !== '$0';
     h += `<div class="r-item">
       <div class="r-qty">×${item.qty}</div>
       <div class="r-nombre">${esc(item.nombre)}</div>
       ${showP ? `<div class="r-precio">${esc(item.precio)}</div>` : ''}
+      <button class="r-rm" data-ridx="${idx}">✕</button>
     </div>`;
   });
   if (hasRealPrices()) {
@@ -422,6 +557,16 @@ function renderResumen() {
   }
   document.getElementById('resumen-scroll').innerHTML = h;
 }
+
+document.getElementById('resumen-scroll').addEventListener('click', e => {
+  const rm = e.target.closest('[data-ridx]');
+  if (!rm) return;
+  const idx = +rm.dataset.ridx;
+  if (cart[idx]) {
+    cart[idx].qty > 1 ? cart[idx].qty-- : cart.splice(idx, 1);
+    cartSave(); updateCartUI(); renderResumen();
+  }
+});
 
 // ── SEND ──────────────────────────────────────────────
 function buildMsg() {
