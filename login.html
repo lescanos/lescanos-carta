@@ -158,12 +158,21 @@ function renderUsers(users) {
   }
   grid.innerHTML = users.map(u => {
     const emoji = u.emoji || ROLE_EMOJI[u.rol] || '🧑';
-    return `<div class="user-tile" onclick="selectUser(${JSON.stringify(esc(u.id))},${JSON.stringify(esc(u.login_key||''))},${JSON.stringify(esc(u.nombre))},${JSON.stringify(u.rol)})">
+    return `<div class="user-tile"
+      data-id="${esc(u.id)}"
+      data-key="${esc(u.login_key||'')}"
+      data-nombre="${esc(u.nombre)}"
+      data-rol="${esc(u.rol)}">
       <div class="tile-emoji">${emoji}</div>
       <div class="tile-nombre">${esc(u.nombre)}</div>
       <div class="tile-rol">${ROLE_LABEL[u.rol] || u.rol}</div>
     </div>`;
   }).join('');
+  grid.querySelectorAll('.user-tile').forEach(tile => {
+    tile.addEventListener('click', () =>
+      selectUser(tile.dataset.id, tile.dataset.key, tile.dataset.nombre, tile.dataset.rol)
+    );
+  });
 }
 
 function selectUser(id, loginKey, nombre, rol) {
