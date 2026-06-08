@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>Lescano's — Cocina</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --gold:#C9A84C;--dark:#0a0a0a;--dark2:#161616;--dark3:#1e1e1e;
+      --gray:#666;--border:rgba(201,168,76,.2);--green:#2d7a2d;--green-bright:#4caf50;
+    }
+    html,body{
+      min-height:100%;background:var(--dark);font-family:'Lato',sans-serif;
+      color:#fff;-webkit-tap-highlight-color:transparent;
+    }
+
+    /* ── HEADER ── */
+    .hdr{
+      background:var(--dark2);border-bottom:2px solid var(--border);
+      padding:14px 18px;display:flex;align-items:center;gap:12px;
+      position:sticky;top:0;z-index:20;
+    }
+    .hdr-brand{font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:900;color:var(--gold);letter-spacing:.06em;}
+    .hdr-sep{color:var(--gray);font-size:.9rem;}
+    .hdr-title{font-size:.8rem;font-weight:700;color:#bbb;letter-spacing:.14em;text-transform:uppercase;}
+    .hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+    .pending-badge{
+      background:var(--gold);color:#000;font-size:.75rem;font-weight:900;
+      padding:4px 12px;border-radius:20px;letter-spacing:.04em;min-width:28px;text-align:center;
+    }
+    .pending-badge.zero{background:rgba(255,255,255,.1);color:var(--gray);}
+    .btn-refresh{
+      background:transparent;border:1px solid var(--border);color:var(--gold);
+      font-size:.72rem;padding:6px 12px;border-radius:6px;cursor:pointer;letter-spacing:.06em;
+    }
+    .btn-refresh:active{background:rgba(201,168,76,.1);}
+    .back-link{
+      background:transparent;border:1px solid rgba(201,168,76,.25);color:rgba(201,168,76,.6);
+      font-size:.58rem;padding:5px 10px;border-radius:4px;cursor:pointer;
+      text-decoration:none;letter-spacing:.08em;
+    }
+
+    /* ── REALTIME STATUS ── */
+    .rt-bar{
+      display:flex;align-items:center;gap:6px;padding:6px 18px;
+      background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.04);
+      font-size:.6rem;color:var(--gray);letter-spacing:.08em;
+    }
+    .rt-dot{width:7px;height:7px;border-radius:50%;background:var(--gray);flex-shrink:0;transition:background .3s;}
+    .rt-dot.connected{background:#4caf50;}
+    .rt-dot.connecting{background:var(--gold);animation:pulse .8s infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* ── FLASH NOTIFICATION ── */
+    .flash{
+      position:fixed;top:0;left:0;right:0;z-index:100;
+      background:var(--gold);color:#000;
+      font-weight:900;font-size:.95rem;letter-spacing:.06em;text-align:center;
+      padding:11px;transform:translateY(-100%);transition:transform .25s ease;
+    }
+    .flash.show{transform:translateY(0);}
+
+    /* ── MAIN ── */
+    .main{padding:16px 14px 40px;}
+
+    /* ── SECTION LABELS ── */
+    .sec-label{
+      font-size:.58rem;color:var(--gray);letter-spacing:.22em;text-transform:uppercase;
+      margin-bottom:10px;display:flex;align-items:center;gap:8px;
+    }
+    .sec-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06);}
+
+    /* ── PENDING GRID ── */
+    .pending-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+      gap:12px;margin-bottom:28px;
+    }
+
+    /* ── ORDER CARD ── */
+    .order-card{
+      background:var(--dark2);border:2px solid rgba(201,168,76,.35);
+      border-radius:14px;overflow:hidden;
+      transition:box-shadow .3s,border-color .3s;
+    }
+    .order-card.new-order{
+      border-color:var(--gold);
+      animation:newFlash 2.5s ease-out forwards;
+    }
+    @keyframes newFlash{
+      0%  {box-shadow:0 0 0 6px rgba(201,168,76,.5);}
+      60% {box-shadow:0 0 0 6px rgba(201,168,76,.15);}
+      100%{box-shadow:none;}
+    }
+
+    .card-head{
+      background:rgba(201,168,76,.08);border-bottom:1px solid var(--border);
+      padding:12px 14px;display:flex;align-items:baseline;gap:8px;
+    }
+    .card-mesa{
+      font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:900;
+      color:var(--gold);letter-spacing:.04em;flex:1;
+    }
+    .card-time{font-size:.68rem;color:var(--gray);letter-spacing:.04em;white-space:nowrap;}
+    .card-time.late{color:#e57373;}
+
+    .card-items{padding:12px 14px 6px;}
+    .item-row{display:flex;gap:10px;padding:5px 0;border-bottom:.5px solid rgba(255,255,255,.04);}
+    .item-row:last-child{border-bottom:none;}
+    .item-qty{
+      font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:900;
+      color:var(--gold);min-width:28px;flex-shrink:0;line-height:1.3;
+    }
+    .item-info{flex:1;}
+    .item-nombre{font-size:.95rem;font-weight:700;color:#fff;line-height:1.3;}
+    .item-nota{font-size:.72rem;color:#aaa;font-style:italic;margin-top:2px;line-height:1.3;}
+
+    .btn-listo{
+      width:calc(100% - 28px);margin:10px 14px 14px;padding:13px;
+      background:var(--green);color:#fff;border:none;border-radius:10px;
+      font-weight:900;font-size:.95rem;cursor:pointer;letter-spacing:.06em;
+      transition:background .15s,transform .1s;
+    }
+    .btn-listo:active{background:#1e5c1e;transform:scale(.98);}
+
+    /* ── EMPTY STATE ── */
+    .empty-state{
+      grid-column:1/-1;text-align:center;padding:50px 20px;
+      color:var(--gray);
+    }
+    .empty-icon{font-size:3rem;margin-bottom:12px;opacity:.3;}
+    .empty-text{font-size:.9rem;letter-spacing:.04em;}
+
+    /* ── DONE SECTION ── */
+    .done-section{margin-top:8px;}
+    .done-list{display:flex;flex-direction:column;gap:6px;}
+    .order-done{
+      background:var(--dark3);border:1px solid rgba(255,255,255,.06);
+      border-radius:10px;padding:10px 14px;
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    }
+    .done-check{color:var(--green-bright);font-size:.9rem;flex-shrink:0;}
+    .done-mesa{font-size:.82rem;font-weight:700;color:#aaa;flex-shrink:0;}
+    .done-items{font-size:.75rem;color:var(--gray);flex:1;line-height:1.4;}
+    .done-items .nota-inline{font-style:italic;opacity:.7;}
+    .done-time{font-size:.65rem;color:var(--gray);white-space:nowrap;margin-left:auto;}
+    .done-dur{
+      font-size:.58rem;background:rgba(76,175,80,.15);color:var(--green-bright);
+      padding:2px 7px;border-radius:8px;white-space:nowrap;flex-shrink:0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="flash" id="flash">🔔 NUEVO PEDIDO</div>
+
+<div class="hdr">
+  <div class="hdr-brand">Lescano's</div>
+  <div class="hdr-sep">·</div>
+  <div class="hdr-title">Cocina</div>
+  <div class="hdr-right">
+    <span class="pending-badge zero" id="pending-badge">0</span>
+    <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
+    <a class="back-link" href="./index.html">← Panel</a>
+  </div>
+</div>
+
+<div class="rt-bar">
+  <div class="rt-dot connecting" id="rt-dot"></div>
+  <span id="rt-label">Conectando en tiempo real...</span>
+</div>
+
+<div class="main">
+  <div class="sec-label">Pedidos pendientes</div>
+  <div class="pending-grid" id="pending-grid">
+    <div class="empty-state">
+      <div class="empty-icon">🍳</div>
+      <div class="empty-text">Cargando pedidos...</div>
+    </div>
+  </div>
+
+  <div class="done-section" id="done-section" style="display:none;">
+    <div class="sec-label">Listos hoy</div>
+    <div class="done-list" id="done-list"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────
+const SB_URL = 'https://hfayvobhkkkdrijzsmtk.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmYXl2b2Joa2trZHJpanpzbXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Njg2NTgsImV4cCI6MjA5NjQ0NDY1OH0.baQL05XahRraU88bmTuni1Uh0rBN9IqbET98DM_g4Os';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+// ── STATE ─────────────────────────────────────────────
+let orders = [];
+
+// ── UTILS ─────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function mesaLabel(mesa) {
+  return mesa === 'llevar' ? 'PARA LLEVAR' : `MESA ${(mesa||'').replace('mesa_','')}`;
+}
+function formatTime(d) {
+  return new Date(d).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+function timeAgo(dateStr) {
+  const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (s < 60)   return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)} min`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}min`;
+}
+function isLate(dateStr) {
+  return (Date.now() - new Date(dateStr)) > 15 * 60 * 1000; // > 15 min
+}
+
+// ── SOUND ─────────────────────────────────────────────
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1100].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.25);
+    });
+  } catch(e) {}
+}
+
+// ── FLASH NOTIFICATION ────────────────────────────────
+let flashTimer = null;
+function showFlash(msg) {
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── KEEP SCREEN ON ────────────────────────────────────
+async function keepScreenOn() {
+  try {
+    if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+  } catch(e) {}
+}
+
+// ── LOAD ORDERS ───────────────────────────────────────
+async function loadOrders() {
+  const today = new Date().toISOString().split('T')[0];
+  try {
+    const [{ data: pending }, { data: done }] = await Promise.all([
+      sb.from('pedidos')
+        .select('*, sesiones(mesa), pedido_items(*)')
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: true }),
+      sb.from('pedidos')
+        .select('*, sesiones(mesa), pedido_items(*)')
+        .eq('estado', 'listo')
+        .gte('listo_at', `${today}T00:00:00`)
+        .order('listo_at', { ascending: false })
+        .limit(15),
+    ]);
+    orders = [...(pending || []), ...(done || [])];
+    renderOrders();
+  } catch(e) {
+    console.error('Error cargando pedidos:', e);
+    document.getElementById('pending-grid').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Error al cargar. Revisá la conexión.</div></div>`;
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────
+function renderOrders() {
+  const pending = orders.filter(o => o.estado === 'pendiente');
+  const done    = orders.filter(o => o.estado === 'listo');
+
+  // Badge
+  const badge = document.getElementById('pending-badge');
+  badge.textContent = pending.length;
+  badge.className = `pending-badge${pending.length === 0 ? ' zero' : ''}`;
+
+  // Pending grid
+  const grid = document.getElementById('pending-grid');
+  if (pending.length === 0) {
+    grid.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">✓</div>
+      <div class="empty-text">Sin pedidos pendientes</div>
+    </div>`;
+  } else {
+    grid.innerHTML = pending.map(o => renderCard(o)).join('');
+  }
+
+  // Done section
+  const doneSection = document.getElementById('done-section');
+  const doneList    = document.getElementById('done-list');
+  if (done.length === 0) {
+    doneSection.style.display = 'none';
+  } else {
+    doneSection.style.display = 'block';
+    doneList.innerHTML = done.map(o => renderDone(o)).join('');
+  }
+}
+
+function renderCard(order) {
+  const mesa  = order.sesiones?.mesa;
+  const items = order.pedido_items || [];
+  const late  = isLate(order.created_at);
+
+  const itemsHtml = items.map(item => `
+    <div class="item-row">
+      <span class="item-qty">${item.qty}×</span>
+      <div class="item-info">
+        <div class="item-nombre">${esc(item.nombre)}</div>
+        ${item.nota ? `<div class="item-nota">📝 ${esc(item.nota)}</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  return `<div class="order-card" id="order-${order.id}">
+    <div class="card-head">
+      <div class="card-mesa">${mesaLabel(mesa)}</div>
+      <div class="card-time${late?' late':''}" data-ts="${order.created_at}">${timeAgo(order.created_at)}</div>
+    </div>
+    <div class="card-items">${itemsHtml}</div>
+    <button class="btn-listo" data-id="${order.id}">✓  Pedido listo</button>
+  </div>`;
+}
+
+function renderDone(order) {
+  const mesa     = order.sesiones?.mesa;
+  const items    = order.pedido_items || [];
+  const listoAt  = order.listo_at ? new Date(order.listo_at) : null;
+  const createdAt = new Date(order.created_at);
+  const durMin   = listoAt ? Math.round((listoAt - createdAt) / 60000) : null;
+
+  const itemsStr = items.map(i =>
+    i.nota ? `${i.qty}× ${esc(i.nombre)} <span class="nota-inline">(${esc(i.nota)})</span>`
+           : `${i.qty}× ${esc(i.nombre)}`
+  ).join(' · ');
+
+  return `<div class="order-done">
+    <span class="done-check">✓</span>
+    <span class="done-mesa">${mesaLabel(mesa)}</span>
+    <span class="done-items">${itemsStr}</span>
+    <span class="done-time">${formatTime(createdAt)}${listoAt ? ` → ${formatTime(listoAt)}` : ''}</span>
+    ${durMin !== null ? `<span class="done-dur">${durMin} min</span>` : ''}
+  </div>`;
+}
+
+// ── MARK AS READY ─────────────────────────────────────
+document.getElementById('pending-grid').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-id]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const listo_at = new Date().toISOString();
+  try {
+    await sb.from('pedidos').update({ estado:'listo', listo_at }).eq('id', id);
+    const idx = orders.findIndex(o => o.id === id);
+    if (idx !== -1) { orders[idx].estado = 'listo'; orders[idx].listo_at = listo_at; }
+    renderOrders();
+  } catch(e) {
+    console.error(e);
+    btn.disabled = false;
+    btn.textContent = '✓  Pedido listo';
+  }
+});
+
+// ── REALTIME ──────────────────────────────────────────
+function setupRealtime() {
+  const dot   = document.getElementById('rt-dot');
+  const label = document.getElementById('rt-label');
+
+  sb.channel('kitchen-orders')
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'pedidos'
+    }, async payload => {
+      // Fetch full order with items + session
+      const { data } = await sb.from('pedidos')
+        .select('*, sesiones(mesa), pedido_items(*)')
+        .eq('id', payload.new.id)
+        .single();
+
+      if (data) {
+        orders.unshift(data);
+        renderOrders();
+        playBeep();
+        const mesa = data.sesiones?.mesa;
+        showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(mesa)}`);
+
+        // Flash the card
+        setTimeout(() => {
+          const card = document.getElementById(`order-${data.id}`);
+          if (card) card.classList.add('new-order');
+        }, 50);
+      }
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        dot.className = 'rt-dot connected';
+        label.textContent = 'En tiempo real';
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        dot.className = 'rt-dot';
+        label.textContent = 'Sin tiempo real — actualizando cada 30s';
+        // Fallback: poll every 30s
+        setInterval(loadOrders, 30000);
+      } else {
+        dot.className = 'rt-dot connecting';
+        label.textContent = 'Conectando...';
+      }
+    });
+}
+
+// ── TIME AGO UPDATE ───────────────────────────────────
+setInterval(() => {
+  document.querySelectorAll('[data-ts]').forEach(el => {
+    const late = isLate(el.dataset.ts);
+    el.textContent = timeAgo(el.dataset.ts);
+    el.className = `card-time${late ? ' late' : ''}`;
+  });
+}, 30000);
+
+// ── REFRESH ───────────────────────────────────────────
+document.getElementById('btn-refresh').addEventListener('click', loadOrders);
+
+// ── INIT ──────────────────────────────────────────────
+keepScreenOn();
+loadOrders();
+setupRealtime();
+</script>
+</body>
+</html>

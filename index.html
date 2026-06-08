@@ -219,6 +219,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
       <div class="hub-card-label">Reportes</div>
       <div class="hub-card-desc">Ventas del día, cierre de caja y exportar CSV</div>
     </div>
+    <div class="hub-card" onclick="goToKitchen()">
+      <div class="hub-icon">🍳</div>
+      <div class="hub-card-label">Cocina</div>
+      <div class="hub-card-desc">Pedidos en tiempo real para la pantalla de cocina</div>
+    </div>
   </div>
   <span class="hub-exit" onclick="exitAdmin()">← Volver a la carta</span>
 </div>
@@ -446,6 +451,9 @@ function goToMesas(){
 function goToReportes(){
   sessionStorage.setItem('admin_auth','1');
   window.location.href='./reports.html';
+}
+function goToKitchen(){
+  window.location.href='./kitchen.html';
 }
 
 // ═══════════════════════════════════════════════════
