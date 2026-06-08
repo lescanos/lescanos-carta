@@ -40,12 +40,17 @@ Muestra tiles con el personal del restaurante. El usuario toca su nombre, ingres
 
 ### `table-service.html` — Servicio de mesas
 
-- Grilla de mesas con indicador de ocupación (punto dorado = abierta)
+- Grilla de mesas con indicador de ocupación (punto dorado = abierta) y nombre de la moza asignada
+- Confirmación al tocar una mesa cerrada — evita abrir sesiones por accidente
 - Selector de items del menú con variantes y notas por item
+- Cubiertos ajustables desde el header del menú (se guardan en Supabase al instante)
 - Resumen dividido en "pendiente de envío" y "ya enviado a cocina"
 - Envío a cocina vía Supabase (guarda pedido con items y notas)
+- Botón "Volver a mesas" después de enviar a cocina (la mesa queda abierta para más pedidos)
+- Notificación sonora + banner "Pedido listo — Mesa X" visible en **cualquier pantalla** al marcar la cocina
 - Cierre de mesa: selección de método de pago + cubiertos
 - Registro de la moza que atendió cada mesa
+- **Envíos a domicilio**: formulario de datos del cliente, sesión tipo `envio`, botón WhatsApp pre-formateado con dirección e items para el cadete
 
 ### `kitchen.html` — Pantalla de cocina
 
@@ -55,6 +60,7 @@ Muestra tiles con el personal del restaurante. El usuario toca su nombre, ingres
 - Indicador rojo si el pedido supera los 15 minutos
 - Botón "Listo" marca el pedido como completado
 - Fallback a polling cada 30 segundos si cae la conexión websocket
+- Al confirmar el cierre de caja, la sección "Listos hoy" se limpia automáticamente vía Realtime
 
 ### `reports.html` — Reportes diarios
 
@@ -64,19 +70,32 @@ Muestra tiles con el personal del restaurante. El usuario toca su nombre, ingres
 - Mesas abiertas activas con subtotal estimado
 - Historial de mesas cerradas con moza, método, duración e items
 - Top 8 productos del día por cantidad
-- Cierre de caja (queda registrado en tabla `cierres`)
+- Cierre de caja: registra el cierre, **cierra todas las mesas abiertas** y limpia la pantalla de cocina
 - Exportación CSV compatible con Excel
 
 ## Estructura de base de datos (Supabase)
 
 ```
 perfiles       — usuarios del sistema (id, nombre, login_key, rol, emoji, activo)
-sesiones       — mesas abiertas/cerradas (mesa, estado, cubiertos, moza_id, moza_nombre)
+sesiones       — mesas abiertas/cerradas (mesa, estado, cubiertos, moza_id, moza_nombre,
+                 tipo, cliente_nombre, cliente_telefono, cliente_direccion, cliente_referencia)
 pedidos        — cada envío a cocina (sesion_id, estado, listo_at)
 pedido_items   — items de cada pedido (nombre, precio, qty, nota, seccion)
 pagos          — pago al cerrar mesa (sesion_id, metodo, monto)
 cierres        — cierre de caja diario (fecha, totales por método)
 config         — configuración dinámica (num_mesas, etc.)
+```
+
+> **Nota:** El campo `tipo` en `sesiones` puede ser `'mesa'` (default) o `'envio'` (delivery). Las columnas `cliente_*` solo se usan para envíos.
+
+Si la tabla `sesiones` fue creada antes de agregar delivery, ejecutar:
+```sql
+alter table sesiones
+  add column if not exists tipo text default 'mesa',
+  add column if not exists cliente_nombre text,
+  add column if not exists cliente_telefono text,
+  add column if not exists cliente_direccion text,
+  add column if not exists cliente_referencia text;
 ```
 
 ## Gestión de usuarios
@@ -144,10 +163,18 @@ El cambio es inmediato. La próxima vez que el usuario ingrese, usa la contrase�
 ### Durante el servicio
 
 ```
-Moza selecciona mesa → elige items + notas → "Enviar a cocina"
+Moza toca mesa → confirma apertura → elige items + notas → "Enviar a cocina"
   → Supabase guarda pedido
   → Cocina recibe notificación en tiempo real + beep
   → Cocinero marca "Listo" cuando el plato está
+  → Moza recibe banner "Pedido listo — Mesa X" en cualquier pantalla
+```
+
+### Envíos a domicilio
+
+```
+Moza toca "Nuevo envío" → completa datos del cliente → elige items → "Enviar a cocina"
+  → Botón WhatsApp genera mensaje pre-formateado con dirección e items para el cadete
 ```
 
 ### Cierre de mesa
@@ -162,7 +189,7 @@ Moza o Caja → "Cerrar mesa" → selecciona método de pago + cubiertos
 
 1. Abrir `reports.html` con la fecha del día
 2. Revisar totales y desglose por método
-3. Presionar "Cierre de caja" — queda registrado en Supabase
+3. Presionar "Cierre de caja" — registra el cierre, cierra todas las mesas abiertas y limpia la cocina
 4. Exportar CSV si se necesita para contabilidad
 
 ### Actualización del menú
@@ -177,16 +204,6 @@ Moza o Caja → "Cerrar mesa" → selecciona método de pago + cubiertos
 1. Dueño abre el panel admin desde `index.html`
 2. En el hub, campo "Cantidad de mesas" → ingresar el nuevo número → "Guardar"
 3. El cambio se aplica inmediatamente sin deploy
-
-## Ramas
-
-
-| Rama                       | Propósito                                                      |
-| -------------------------- | -------------------------------------------------------------- |
-| `master`                   | Producción — lo que está live en GitHub Pages                  |
-| `feature/supabase-backend` | Desarrollo activo (nunca tocar mientras el local está abierto) |
-| `release/v2.0-supabase`    | Staging — listo para mergear a master cuando cierra el local   |
-
 
 ## Deploy
 
