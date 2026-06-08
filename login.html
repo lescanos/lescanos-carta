@@ -103,10 +103,10 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 
 let selectedUser = null;
 
-const ROLE_EMOJI = { dueno: '👑', moza: '🧑‍💼', cocina: '🍳' };
-const ROLE_LABEL = { dueno: 'Dueño', moza: 'Moza', cocina: 'Cocina' };
-const ROLE_ORDER = { dueno: 0, moza: 1, cocina: 2 };
-const ROLE_REDIRECT = { dueno: './index.html', moza: './table-service.html', cocina: './kitchen.html' };
+const ROLE_EMOJI = { dueno: '👑', moza: '🧑‍💼', cocina: '🍳', caja: '💵' };
+const ROLE_LABEL = { dueno: 'Dueño', moza: 'Moza', cocina: 'Cocina', caja: 'Caja' };
+const ROLE_ORDER = { dueno: 0, moza: 1, caja: 2, cocina: 3 };
+const ROLE_REDIRECT = { dueno: './index.html', moza: './table-service.html', cocina: './kitchen.html', caja: './table-service.html' };
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

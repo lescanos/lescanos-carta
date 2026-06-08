@@ -1076,7 +1076,7 @@ async function doLogout() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = './login.html'; return; }
   const { data: perfil } = await sb.from('perfiles').select('id,nombre,rol,activo').eq('id', session.user.id).single();
-  if (!perfil || !perfil.activo || !['moza','dueno'].includes(perfil.rol)) {
+  if (!perfil || !perfil.activo || !['moza','dueno','caja'].includes(perfil.rol)) {
     window.location.href = './login.html?error=acceso'; return;
   }
   currentUser = { id: session.user.id, nombre: perfil.nombre, rol: perfil.rol };
