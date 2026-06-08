@@ -295,10 +295,11 @@
     <div class="hdr">
       <div class="hdr-brand">Lescano's</div>
       <div class="hdr-sub">— Pedidos</div>
-      <button onclick="window.location.href='./index.html'"
+      <span id="hdr-user" style="flex:1;font-size:.6rem;color:var(--gray);text-align:right;"></span>
+      <button onclick="doLogout()"
         style="background:transparent;border:1px solid rgba(201,168,76,.3);color:rgba(201,168,76,.7);
-        font-size:.6rem;padding:.3rem .6rem;border-radius:4px;cursor:pointer;margin-left:auto;letter-spacing:.08em;">
-        ← Panel
+        font-size:.6rem;padding:.3rem .6rem;border-radius:4px;cursor:pointer;margin-left:.5rem;letter-spacing:.08em;">
+        Salir
       </button>
     </div>
     <div class="mesa-heading">¿Para qué mesa?</div>
@@ -415,6 +416,7 @@ let sessionItems     = [];    // items ya enviados en esta sesión
 let openSessions     = {};    // { 'mesa_1': session, ... }
 let noteEditIdx      = null;  // índice en cart del item con nota abierta
 let selectedCubiertos = 1;   // cubiertos para el cierre de mesa
+let currentUser      = null;  // { id, nombre, rol }
 
 // ── LOCALSTORAGE (fallback sin conexión) ──────────────
 const lsKey = () => mesa === 'llevar' ? 'lescanos_order_llevar' : `lescanos_order_${mesa}`;
@@ -464,7 +466,7 @@ async function openOrLoadSession(mesaId) {
       await loadSessionItems();
     } else {
       const { data: created, error } = await sb.from('sesiones')
-        .insert({ mesa: mesaId, estado: 'abierta' }).select().single();
+        .insert({ mesa: mesaId, estado: 'abierta', moza_id: currentUser?.id || null, moza_nombre: currentUser?.nombre || null }).select().single();
       if (error) throw error;
       currentSession = created;
       sessionItems = [];
@@ -1057,8 +1059,23 @@ function esc(s) {
 }
 
 // ── INIT ──────────────────────────────────────────────
-renderMesas();
-showScreen('mesas');
+async function doLogout() {
+  await sb.auth.signOut();
+  window.location.href = './login.html';
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = './login.html'; return; }
+  const { data: perfil } = await sb.from('perfiles').select('id,nombre,rol,activo').eq('id', session.user.id).single();
+  if (!perfil || !perfil.activo || !['moza','dueno'].includes(perfil.rol)) {
+    window.location.href = './login.html?error=acceso'; return;
+  }
+  currentUser = { id: session.user.id, nombre: perfil.nombre, rol: perfil.rol };
+  document.getElementById('hdr-user').textContent = currentUser.nombre;
+  renderMesas();
+  showScreen('mesas');
+})();
 </script>
 </body>
 </html>

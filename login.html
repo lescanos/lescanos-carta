@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Lescano's — Ingresar</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#C9A84C;--dark:#111111;--dark2:#1C1C1C;--gray:#888888;}
+body{background:var(--dark);font-family:'Lato',sans-serif;min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:1.5rem;-webkit-tap-highlight-color:transparent;}
+
+/* ── HEADER ── */
+.brand{font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:var(--gold);letter-spacing:.08em;}
+.brand-sub{font-size:.6rem;color:var(--gray);letter-spacing:.3em;margin-top:.3rem;margin-bottom:2rem;}
+
+/* ── USER TILES ── */
+.step-users{width:100%;max-width:400px;}
+.step-label{font-size:.6rem;color:var(--gray);letter-spacing:.2em;text-align:center;margin-bottom:1rem;}
+.user-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.75rem;}
+.user-tile{background:#1C1C1C;border:1.5px solid rgba(201,168,76,.2);border-radius:12px;
+  padding:1.2rem .8rem;cursor:pointer;text-align:center;
+  transition:border-color .2s,background .2s,transform .15s;}
+.user-tile:hover,.user-tile:active{border-color:var(--gold);background:#222;transform:scale(1.04);}
+.user-tile.selected{border-color:var(--gold);background:#222;}
+.tile-emoji{font-size:2rem;margin-bottom:.5rem;line-height:1;}
+.tile-nombre{font-size:.78rem;font-weight:700;color:#fff;line-height:1.3;}
+.tile-rol{font-size:.58rem;color:var(--gray);margin-top:.2rem;letter-spacing:.08em;}
+
+/* ── PIN FORM ── */
+.step-pin{width:100%;max-width:320px;display:none;}
+.step-pin.visible{display:flex;flex-direction:column;align-items:center;gap:1rem;}
+.pin-greeting{font-size:1rem;color:#fff;font-weight:700;text-align:center;}
+.pin-greeting span{color:var(--gold);}
+.pin-label{font-size:.62rem;color:var(--gray);letter-spacing:.2em;text-align:center;}
+.pin-input-wrap{position:relative;width:100%;}
+.pin-input{background:#1C1C1C;border:1.5px solid rgba(201,168,76,.3);color:#fff;width:100%;
+  padding:.75rem 1rem;border-radius:8px;font-size:1.1rem;letter-spacing:.3em;outline:none;
+  font-family:'Lato',sans-serif;text-align:center;}
+.pin-input:focus{border-color:var(--gold);}
+.pin-btn{background:var(--gold);color:#111;font-weight:700;font-size:.85rem;
+  padding:.65rem;border-radius:8px;border:none;cursor:pointer;letter-spacing:.08em;width:100%;}
+.pin-btn:hover{background:#E8D5A0;}
+.pin-btn:disabled{opacity:.5;cursor:not-allowed;}
+.pin-error{font-size:.7rem;color:#e05252;text-align:center;min-height:1.2em;}
+.pin-back{font-size:.62rem;color:var(--gray);cursor:pointer;text-decoration:underline;text-align:center;}
+
+/* ── LOADING ── */
+.spinner{display:none;width:28px;height:28px;border:3px solid rgba(201,168,76,.2);
+  border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── ERROR STATE ── */
+.load-error{font-size:.75rem;color:#e05252;text-align:center;display:none;max-width:300px;
+  background:rgba(224,82,82,.1);border:1px solid rgba(224,82,82,.3);border-radius:8px;padding:.75rem 1rem;}
+.load-error.show{display:block;}
+
+/* ── ACCESO DENEGADO ── */
+.access-msg{font-size:.75rem;color:#e09252;text-align:center;display:none;max-width:300px;
+  background:rgba(224,146,82,.1);border:1px solid rgba(224,146,82,.3);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;}
+.access-msg.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="brand">LESCANO'S</div>
+<div class="brand-sub">SISTEMA INTERNO</div>
+
+<div class="access-msg" id="access-msg">No tenés acceso a esa sección.</div>
+<div class="load-error" id="load-error">No se pudo cargar la lista de usuarios. Verificá la conexión.</div>
+
+<!-- Paso 1: seleccionar usuario -->
+<div class="step-users" id="step-users">
+  <div class="step-label">¿QUIÉN SOS?</div>
+  <div class="user-grid" id="user-grid">
+    <div style="text-align:center;grid-column:1/-1;padding:2rem 0;">
+      <div class="spinner" id="load-spinner" style="display:block;margin:0 auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Paso 2: ingresar contraseña -->
+<div class="step-pin" id="step-pin">
+  <div class="pin-greeting">Hola, <span id="pin-user-name">—</span></div>
+  <div class="pin-label">INGRESÁ TU CONTRASEÑA</div>
+  <input class="pin-input" type="password" id="pin-input"
+    placeholder="••••••••"
+    autocomplete="current-password"
+    onkeydown="if(event.key==='Enter')doLogin()">
+  <div class="pin-error" id="pin-error"></div>
+  <button class="pin-btn" id="pin-btn" onclick="doLogin()">ENTRAR</button>
+  <span class="pin-back" onclick="goBack()">← elegir otro usuario</span>
+</div>
+
+<script>
+const SB_URL = 'https://hfayvobhkkkdrijzsmtk.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmYXl2b2Joa2trZHJpanpzbXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Njg2NTgsImV4cCI6MjA5NjQ0NDY1OH0.baQL05XahRraU88bmTuni1Uh0rBN9IqbET98DM_g4Os';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+let selectedUser = null;
+
+const ROLE_EMOJI = { dueno: '👑', moza: '🧑‍💼', cocina: '🍳' };
+const ROLE_LABEL = { dueno: 'Dueño', moza: 'Moza', cocina: 'Cocina' };
+const ROLE_ORDER = { dueno: 0, moza: 1, cocina: 2 };
+const ROLE_REDIRECT = { dueno: './index.html', moza: './table-service.html', cocina: './kitchen.html' };
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function init() {
+  // Si ya hay sesión activa, redirigir directamente
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const { data: perfil } = await sb.from('perfiles').select('rol,activo').eq('id', session.user.id).single();
+    if (perfil && perfil.activo && ROLE_REDIRECT[perfil.rol]) {
+      window.location.href = ROLE_REDIRECT[perfil.rol];
+      return;
+    }
+    await sb.auth.signOut();
+  }
+
+  // Mostrar mensaje de acceso denegado si viene de redireccionamiento
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error') === 'acceso') {
+    document.getElementById('access-msg').classList.add('show');
+  }
+
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const spinner = document.getElementById('load-spinner');
+  spinner.style.display = 'block';
+
+  const { data, error } = await sb.from('perfiles').select('id,nombre,email,rol,emoji,activo').eq('activo', true);
+
+  spinner.style.display = 'none';
+
+  if (error || !data) {
+    document.getElementById('load-error').classList.add('show');
+    return;
+  }
+
+  const sorted = data.sort((a, b) => ROLE_ORDER[a.rol] - ROLE_ORDER[b.rol]);
+  renderUsers(sorted);
+}
+
+function renderUsers(users) {
+  const grid = document.getElementById('user-grid');
+  if (!users.length) {
+    grid.innerHTML = '<div style="text-align:center;color:#888;font-size:.75rem;grid-column:1/-1;padding:2rem">No hay usuarios configurados.</div>';
+    return;
+  }
+  grid.innerHTML = users.map(u => {
+    const emoji = u.emoji || ROLE_EMOJI[u.rol] || '🧑';
+    return `<div class="user-tile" onclick="selectUser(${JSON.stringify(esc(u.id))},${JSON.stringify(esc(u.email))},${JSON.stringify(esc(u.nombre))},${JSON.stringify(u.rol)})">
+      <div class="tile-emoji">${emoji}</div>
+      <div class="tile-nombre">${esc(u.nombre)}</div>
+      <div class="tile-rol">${ROLE_LABEL[u.rol] || u.rol}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectUser(id, email, nombre, rol) {
+  selectedUser = { id, email, nombre, rol };
+  document.getElementById('pin-user-name').textContent = nombre;
+  document.getElementById('step-users').style.display = 'none';
+  const stepPin = document.getElementById('step-pin');
+  stepPin.classList.add('visible');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').textContent = '';
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+function goBack() {
+  selectedUser = null;
+  document.getElementById('step-pin').classList.remove('visible');
+  document.getElementById('step-users').style.display = 'block';
+  document.getElementById('pin-error').textContent = '';
+}
+
+async function doLogin() {
+  if (!selectedUser) return;
+  const btn = document.getElementById('pin-btn');
+  const errEl = document.getElementById('pin-error');
+  const pwd = document.getElementById('pin-input').value;
+  if (!pwd) { errEl.textContent = 'Ingresá tu contraseña.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  errEl.textContent = '';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email: selectedUser.email, password: pwd });
+
+  if (error || !data.session) {
+    errEl.textContent = 'Contraseña incorrecta.';
+    btn.disabled = false;
+    btn.textContent = 'ENTRAR';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+    return;
+  }
+
+  // Verificar que el perfil existe y está activo
+  const { data: perfil } = await sb.from('perfiles').select('rol,activo').eq('id', data.session.user.id).single();
+  if (!perfil || !perfil.activo) {
+    await sb.auth.signOut();
+    errEl.textContent = 'Usuario inactivo. Consultá al dueño.';
+    btn.disabled = false;
+    btn.textContent = 'ENTRAR';
+    return;
+  }
+
+  window.location.href = ROLE_REDIRECT[perfil.rol] || './index.html';
+}
+
+init();
+</script>
+</body>
+</html>

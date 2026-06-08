@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Lescano's — Carta Digital</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -183,26 +184,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
   <div class="carousel" id="carousel"></div>
   <div class="nav-dots" id="dots"></div>
   <div class="swipe-hint">← deslizá para ver más →</div>
-  <button class="admin-btn" onclick="showLogin()">⚙ admin</button>
-</div>
-
-<!-- ═══════ LOGIN VIEW ═══════ -->
-<div id="login-view">
-  <div class="login-logo">LESCANO'S</div>
-  <div class="login-sub">PANEL ADMINISTRADOR</div>
-  <div class="login-box">
-    <label>CONTRASEÑA</label>
-    <input type="password" id="pwd-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkLogin()">
-    <div class="login-error" id="login-error">Contraseña incorrecta</div>
-    <button class="login-btn" onclick="checkLogin()">INGRESAR</button>
-  </div>
-  <span class="back-btn-login" onclick="showCarta()">← volver a la carta</span>
+  <button class="admin-btn" id="admin-btn" onclick="checkAdmin()">⚙ admin</button>
 </div>
 
 <!-- ═══════ HUB VIEW ═══════ -->
 <div id="hub-view">
   <div class="hub-brand">LESCANO'S</div>
   <div class="hub-sub">PANEL DE ADMINISTRACIÓN</div>
+  <div id="hub-user" style="font-size:.62rem;color:var(--gray);letter-spacing:.1em;margin-top:-.8rem;"></div>
   <div class="hub-grid">
     <div class="hub-card" onclick="showAdmin()">
       <div class="hub-icon">💰</div>
@@ -225,7 +214,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
       <div class="hub-card-desc">Pedidos en tiempo real para la pantalla de cocina</div>
     </div>
   </div>
-  <span class="hub-exit" onclick="exitAdmin()">← Volver a la carta</span>
+  <span class="hub-exit" onclick="exitAdmin()">Cerrar sesión</span>
 </div>
 
 <!-- ═══════ ADMIN VIEW ═══════ -->
@@ -250,7 +239,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
 // ═══════════════════════════════════════════════════
 //  CARTA DATA — acá se edita todo desde el panel
 // ═══════════════════════════════════════════════════
-const ADMIN_PASS   = "__ADMIN_PWD__";
+const SB_URL='https://hfayvobhkkkdrijzsmtk.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmYXl2b2Joa2trZHJpanpzbXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Njg2NTgsImV4cCI6MjA5NjQ0NDY1OH0.baQL05XahRraU88bmTuni1Uh0rBN9IqbET98DM_g4Os';
+const sb=supabase.createClient(SB_URL,SB_KEY);
 const MENU_TOKEN   = "__MENU_TOKEN__";
 const GH_OWNER     = 'lescanos';
 const GH_REPO      = 'lescanos-carta';
@@ -406,33 +397,26 @@ function initSwipe(){
 // ═══════════════════════════════════════════════════
 function showCarta(){
   document.getElementById('carta-view').style.display='block';
-  document.getElementById('login-view').classList.remove('active');
   document.getElementById('admin-view').classList.remove('active');
   document.getElementById('hub-view').classList.remove('active');
   document.body.style.overflow='hidden';
 }
-function showLogin(){
-  document.getElementById('login-view').classList.add('active');
-  document.getElementById('carta-view').style.display='none';
-  document.getElementById('pwd-input').value='';
-  document.getElementById('login-error').classList.remove('show');
-  setTimeout(()=>document.getElementById('pwd-input').focus(),100);
+async function checkAdmin(){
+  const btn=document.getElementById('admin-btn');
+  btn.disabled=true;
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){window.location.href='./login.html';return;}
+    const {data:p}=await sb.from('perfiles').select('rol,nombre,activo').eq('id',session.user.id).single();
+    if(!p||!p.activo||p.rol!=='dueno'){window.location.href='./login.html?error=acceso';return;}
+    showHub(p.nombre);
+  }finally{btn.disabled=false;}
 }
-function checkLogin(){
-  const v=document.getElementById('pwd-input').value;
-  if(v===ADMIN_PASS){
-    sessionStorage.setItem('admin_auth','1');
-    document.getElementById('login-view').classList.remove('active');
-    showHub();
-  }else{
-    document.getElementById('login-error').classList.add('show');
-    document.getElementById('pwd-input').value='';
-  }
-}
-function showHub(){
+function showHub(nombre){
   document.getElementById('hub-view').classList.add('active');
   document.getElementById('admin-view').classList.remove('active');
   document.getElementById('carta-view').style.display='none';
+  if(nombre)document.getElementById('hub-user').textContent=nombre.toUpperCase();
 }
 function showAdmin(){
   document.getElementById('admin-view').classList.add('active');
@@ -440,21 +424,13 @@ function showAdmin(){
   document.getElementById('carta-view').style.display='none';
   renderAdmin();
 }
-function exitAdmin(){
-  sessionStorage.removeItem('admin_auth');
+async function exitAdmin(){
+  await sb.auth.signOut();
   showCarta();
 }
-function goToMesas(){
-  sessionStorage.setItem('admin_auth','1');
-  window.location.href='./table-service.html';
-}
-function goToReportes(){
-  sessionStorage.setItem('admin_auth','1');
-  window.location.href='./reports.html';
-}
-function goToKitchen(){
-  window.location.href='./kitchen.html';
-}
+function goToMesas(){window.location.href='./table-service.html';}
+function goToReportes(){window.location.href='./reports.html';}
+function goToKitchen(){window.location.href='./kitchen.html';}
 
 // ═══════════════════════════════════════════════════
 //  ADMIN RENDER
@@ -610,7 +586,12 @@ async function saveAndApply(){
 (async()=>{
   CARTA=await loadCarta();
   renderCarta();
-  sessionStorage.getItem('admin_auth')?showHub():showCarta();
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){
+    const {data:p}=await sb.from('perfiles').select('rol,nombre,activo').eq('id',session.user.id).single();
+    if(p&&p.activo&&p.rol==='dueno'){showHub(p.nombre);return;}
+  }
+  showCarta();
 })();
 </script>
 </body>

@@ -167,6 +167,11 @@
     <span class="pending-badge zero" id="pending-badge">0</span>
     <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
     <a class="back-link" href="./index.html">← Panel</a>
+    <button onclick="doLogout()"
+      style="background:transparent;border:1px solid rgba(201,168,76,.3);color:rgba(201,168,76,.7);
+      font-size:.62rem;padding:.3rem .6rem;border-radius:4px;cursor:pointer;letter-spacing:.08em;">
+      Salir
+    </button>
   </div>
 </div>
 
@@ -434,9 +439,22 @@ setInterval(() => {
 document.getElementById('btn-refresh').addEventListener('click', loadOrders);
 
 // ── INIT ──────────────────────────────────────────────
-keepScreenOn();
-loadOrders();
-setupRealtime();
+async function doLogout() {
+  await sb.auth.signOut();
+  window.location.href = './login.html';
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = './login.html'; return; }
+  const { data: perfil } = await sb.from('perfiles').select('rol,activo').eq('id', session.user.id).single();
+  if (!perfil || !perfil.activo || !['cocina','dueno'].includes(perfil.rol)) {
+    window.location.href = './login.html?error=acceso'; return;
+  }
+  keepScreenOn();
+  loadOrders();
+  setupRealtime();
+})();
 </script>
 </body>
 </html>

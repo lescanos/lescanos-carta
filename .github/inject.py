@@ -1,6 +1,6 @@
 import os, sys
 
-required = ['ADMIN_PWD', 'WA_NUMBER', 'NUM_MESAS', 'MENU_TOKEN']
+required = ['WA_NUMBER', 'NUM_MESAS', 'MENU_TOKEN']
 secrets = {}
 
 for key in required:
@@ -12,7 +12,6 @@ for key in required:
 
 replacements = {
     'dist/index.html': [
-        ('__ADMIN_PWD__', secrets['ADMIN_PWD']),
         ('__MENU_TOKEN__', secrets['MENU_TOKEN']),
     ],
     'dist/table-service.html': [
