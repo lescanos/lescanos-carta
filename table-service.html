@@ -533,7 +533,6 @@ let noteEditIdx      = null;  // índice en cart del item con nota abierta
 let pendingMesaKey   = null;  // mesa esperando confirmación de apertura
 let selectedCubiertos = 1;   // cubiertos para el cierre de mesa
 let hdrCubiertos     = 1;    // cubiertos visibles en el header del menú
-let listoChannel     = null; // canal Realtime para notif "pedido listo"
 let currentUser      = null;  // { id, nombre, rol }
 
 // ── LOCALSTORAGE (fallback sin conexión) ──────────────
@@ -570,13 +569,13 @@ async function loadOpenSessions() {
   // Intentar con columnas de delivery; si fallan (schema viejo), caer a columnas básicas
   let data = null;
   const full = await sb.from('sesiones')
-    .select('mesa,id,created_at,tipo,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
+    .select('mesa,id,created_at,tipo,moza_id,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
     .eq('estado','abierta');
   if (!full.error) {
     data = full.data;
   } else {
     const basic = await sb.from('sesiones')
-      .select('mesa,id,created_at,moza_nombre')
+      .select('mesa,id,created_at,moza_id,moza_nombre')
       .eq('estado','abierta');
     data = basic.data;
   }
@@ -603,7 +602,6 @@ async function openOrLoadSession(mesaId) {
       sessionItems = [];
     }
     initCubiertosHdr();
-    subscribeListoNotifs();
   } catch(e) {
     console.error('Supabase:', e);
     currentSession = null;
@@ -640,21 +638,48 @@ async function setCubiertosHdr(n) {
 document.getElementById('cub-hdr-minus').addEventListener('click', () => setCubiertosHdr(hdrCubiertos - 1));
 document.getElementById('cub-hdr-plus').addEventListener('click',  () => setCubiertosHdr(hdrCubiertos + 1));
 
-// ── NOTIFICACIÓN PEDIDO LISTO ─────────────────────────
-async function subscribeListoNotifs() {
-  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
-  if (!currentSession) return;
-  listoChannel = sb.channel(`listo-${currentSession.id}`)
+// ── NOTIFICACIÓN PEDIDO LISTO (global) ────────────────
+// Una sola suscripción activa toda la sesión. Notifica en cualquier pantalla.
+function setupGlobalListoNotifs() {
+  sb.channel('moza-listo-global')
     .on('postgres_changes', {
-      event: 'UPDATE', schema: 'public', table: 'pedidos',
-      filter: `sesion_id=eq.${currentSession.id}`
+      event: 'UPDATE', schema: 'public', table: 'pedidos'
     }, payload => {
-      if (payload.new?.estado === 'listo') showListoNotif();
+      if (payload.new?.estado !== 'listo') return;
+      const sesionId = payload.new.sesion_id;
+      const label = findLabelForSesion(sesionId);
+      if (label) showListoNotif(label);
     })
     .subscribe();
 }
 
-function showListoNotif() {
+// Devuelve el label de la mesa si la sesión pertenece a esta moza, o null si no le corresponde.
+function findLabelForSesion(sesionId) {
+  const isCajaOrDueno = currentUser?.rol === 'caja' || currentUser?.rol === 'dueno';
+
+  // Sesión actualmente abierta en pantalla
+  if (currentSession?.id === sesionId) return mesaLabel();
+
+  // Sesiones de mesas normales en openSessions
+  for (const [key, sess] of Object.entries(openSessions)) {
+    if (sess.id === sesionId) {
+      if (isCajaOrDueno || sess.moza_id === currentUser?.id) return mesaKeyLabel(key);
+      return null;
+    }
+  }
+
+  // Sesiones de envío
+  const envio = deliverySessions.find(s => s.id === sesionId);
+  if (envio) {
+    if (isCajaOrDueno || envio.moza_id === currentUser?.id) {
+      return envio.cliente_nombre ? 'Envío — ' + envio.cliente_nombre : 'Envío';
+    }
+  }
+
+  return null;
+}
+
+function showListoNotif(label) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     [660, 880].forEach((freq, i) => {
@@ -668,7 +693,7 @@ function showListoNotif() {
     });
   } catch(e) {}
   const banner = document.getElementById('listo-banner');
-  document.getElementById('listo-banner-txt').textContent = `🍽️ Pedido listo — ${mesaLabel()}`;
+  document.getElementById('listo-banner-txt').textContent = '🍽️ Pedido listo — ' + label;
   banner.classList.add('show');
   setTimeout(() => banner.classList.remove('show'), 9000);
 }
@@ -1239,7 +1264,6 @@ document.getElementById('del-confirm').addEventListener('click', async () => {
   }
 
   initCubiertosHdr();
-  subscribeListoNotifs();
   document.getElementById('hdr-mesa').textContent = mesaLabel();
   document.getElementById('hdr-resumen-mesa').textContent = mesaLabel();
   document.getElementById('btn-wa-cadete').style.display = 'block';
@@ -1350,8 +1374,6 @@ document.getElementById('btn-enviar').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-volver-mesas').addEventListener('click', async () => {
-  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
-  document.getElementById('listo-banner').classList.remove('show');
   document.getElementById('btn-wa-cadete').style.display = 'none';
   document.getElementById('btn-volver-mesas').style.display = 'none';
   mesa = null; cart = []; currentSession = null; sessionItems = [];
@@ -1381,8 +1403,6 @@ document.getElementById('btn-cerrar').addEventListener('click', () => {
 
 // ── NAV BUTTONS ───────────────────────────────────────
 document.getElementById('back-mesas').addEventListener('click', async () => {
-  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
-  document.getElementById('listo-banner').classList.remove('show');
   document.getElementById('btn-wa-cadete').style.display = 'none';
   // Si la sesión no tiene ningún item enviado ni en carrito, borrarla (se abrió por error)
   if (currentSession && cart.length === 0 && sessionItems.length === 0) {
@@ -1431,6 +1451,7 @@ async function doLogout() {
   currentUser = { id: session.user.id, nombre: perfil.nombre, rol: perfil.rol };
   document.getElementById('hdr-user').textContent = currentUser.nombre;
   await loadConfig();
+  setupGlobalListoNotifs();
   renderMesas();
   showScreen('mesas');
 })();
