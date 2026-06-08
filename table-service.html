@@ -211,6 +211,43 @@
     .r-rm{background:transparent;border:none;color:rgba(255,80,80,.45);font-size:1.1rem;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1;}
     .r-rm:active{color:rgba(255,80,80,.9);}
 
+    /* ── PAYMENT MODAL ── */
+    .pay-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:60;display:none;align-items:flex-end;}
+    .pay-overlay.show{display:flex;}
+    .pay-sheet{width:100%;background:#1a1a1a;border-radius:22px 22px 0 0;border-top:1px solid rgba(201,168,76,.3);padding:8px 0 36px;max-height:92vh;overflow-y:auto;}
+    .pay-handle{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:0 auto 16px;}
+    .pay-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:900;color:var(--gold);text-align:center;letter-spacing:.06em;padding:0 20px 4px;}
+    .pay-mesa-lbl{font-size:.6rem;color:var(--gray);text-align:center;letter-spacing:.12em;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06);}
+    .pay-total-wrap{text-align:center;padding:14px 20px 10px;}
+    .pay-total-lbl{font-size:.6rem;color:var(--gray);letter-spacing:.15em;text-transform:uppercase;}
+    .pay-total-val{font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:var(--gold);line-height:1.1;}
+    .pay-method-lbl{font-size:.58rem;color:var(--gray);letter-spacing:.14em;text-transform:uppercase;padding:8px 20px 6px;}
+    .pay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 14px 14px;}
+    .pay-btn{
+      background:rgba(255,255,255,.04);border:1.5px solid rgba(201,168,76,.15);
+      border-radius:12px;padding:14px 8px 12px;text-align:center;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;gap:5px;
+      transition:border-color .15s,background .15s;
+    }
+    .pay-btn:active{background:rgba(201,168,76,.1);}
+    .pay-btn.selected{border-color:var(--gold);background:rgba(201,168,76,.12);}
+    .pay-btn-icon{font-size:1.4rem;line-height:1;}
+    .pay-btn-lbl{font-size:.6rem;color:#ccc;font-weight:700;letter-spacing:.03em;line-height:1.2;text-align:center;}
+    .pay-btn.selected .pay-btn-lbl{color:var(--gold);}
+    .pay-confirm{
+      width:calc(100% - 28px);margin:4px 14px 0;padding:14px;
+      background:var(--gold);color:var(--dark);font-weight:700;font-size:.95rem;
+      border:none;border-radius:10px;cursor:pointer;letter-spacing:.04em;
+    }
+    .pay-confirm:disabled{background:rgba(201,168,76,.22);color:rgba(0,0,0,.35);cursor:default;}
+    .pay-confirm:not(:disabled):active{opacity:.85;}
+    .pay-cancel{
+      width:calc(100% - 28px);margin:8px 14px 0;padding:11px;
+      background:transparent;color:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.1);
+      border-radius:8px;font-size:.82rem;cursor:pointer;letter-spacing:.04em;
+    }
+    .pay-cancel:active{background:rgba(255,255,255,.04);}
+
     /* ── TOAST ── */
     .toast{
       position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
@@ -280,6 +317,23 @@
     <div class="vp-item-name" id="vp-name"></div>
     <div class="vp-title">¿CÓMO LO QUIERE?</div>
     <div class="vp-options" id="vp-options"></div>
+  </div>
+</div>
+
+<!-- ── PAYMENT MODAL ── -->
+<div class="pay-overlay" id="pay-overlay">
+  <div class="pay-sheet">
+    <div class="pay-handle"></div>
+    <div class="pay-title">Cerrar mesa</div>
+    <div class="pay-mesa-lbl" id="pay-mesa-lbl">Mesa 1</div>
+    <div class="pay-total-wrap">
+      <div class="pay-total-lbl">Total de la cuenta</div>
+      <div class="pay-total-val" id="pay-total">$0</div>
+    </div>
+    <div class="pay-method-lbl">¿Cómo paga la mesa?</div>
+    <div class="pay-grid" id="pay-grid"></div>
+    <button class="pay-confirm" id="pay-confirm" disabled>Confirmar cierre</button>
+    <button class="pay-cancel" id="pay-cancel">Cancelar</button>
   </div>
 </div>
 
@@ -411,7 +465,7 @@ async function saveOrderToSupabase() {
   }
 }
 
-async function closeSession() {
+async function closeSession(metodo, monto) {
   if (!currentSession) {
     currentSession = null; sessionItems = []; cart = []; cartClear();
     await loadOpenSessions(); renderMesas(); showScreen('mesas'); return;
@@ -420,12 +474,68 @@ async function closeSession() {
     await sb.from('sesiones')
       .update({ estado: 'cerrada', closed_at: new Date().toISOString() })
       .eq('id', currentSession.id);
+    if (metodo) {
+      await sb.from('pagos').insert({
+        sesion_id: currentSession.id,
+        metodo,
+        monto: monto || 0
+      });
+    }
   } catch(e) { console.error('Error cerrando sesión:', e); }
   currentSession = null; sessionItems = []; cart = []; cartClear();
   await loadOpenSessions();
   renderMesas();
   showScreen('mesas');
 }
+
+// ── PAYMENT MODAL ─────────────────────────────────────
+const METODOS = [
+  { id:'efectivo',      label:'Efectivo',     icon:'💵' },
+  { id:'debito',        label:'Débito',        icon:'💳' },
+  { id:'credito',       label:'Crédito',       icon:'🏦' },
+  { id:'transferencia', label:'Transferencia', icon:'📱' },
+  { id:'mercadopago',   label:'Mercado Pago',  icon:'🔵' },
+  { id:'pedidosya',     label:'Pedidos Ya',    icon:'🛵' },
+];
+
+let selectedPayMethod = null;
+
+function showPaymentModal() {
+  selectedPayMethod = null;
+  document.getElementById('pay-mesa-lbl').textContent = mesaLabel();
+  const total = grandTotal();
+  document.getElementById('pay-total').textContent =
+    total > 0 ? `$${total.toLocaleString('es-AR')}` : '—';
+  document.getElementById('pay-grid').innerHTML = METODOS.map(m =>
+    `<div class="pay-btn" data-metodo="${m.id}">
+      <div class="pay-btn-icon">${m.icon}</div>
+      <div class="pay-btn-lbl">${m.label}</div>
+    </div>`
+  ).join('');
+  document.getElementById('pay-confirm').disabled = true;
+  document.getElementById('pay-overlay').classList.add('show');
+}
+
+document.getElementById('pay-grid').addEventListener('click', e => {
+  const btn = e.target.closest('[data-metodo]');
+  if (!btn) return;
+  selectedPayMethod = btn.dataset.metodo;
+  document.querySelectorAll('.pay-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('pay-confirm').disabled = false;
+});
+
+document.getElementById('pay-confirm').addEventListener('click', async () => {
+  if (!selectedPayMethod) return;
+  document.getElementById('pay-overlay').classList.remove('show');
+  const monto = grandTotal();
+  await closeSession(selectedPayMethod, monto);
+  toast('Mesa cerrada ✓');
+});
+
+document.getElementById('pay-cancel').addEventListener('click', () => {
+  document.getElementById('pay-overlay').classList.remove('show');
+});
 
 // ── UI HELPERS ────────────────────────────────────────
 function mesaLabel() { return mesa === 'llevar' ? 'Para llevar' : `Mesa ${mesa.replace('mesa_','')}`; }
@@ -815,14 +925,11 @@ document.getElementById('btn-copiar').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('btn-cerrar').addEventListener('click', async () => {
-  const hasItems = cart.length > 0 || sessionItems.length > 0;
-  const msg = hasItems
-    ? '¿Cerrar la cuenta de esta mesa? Los pedidos quedarán guardados en el historial.'
-    : '¿Cerrar la sesión de esta mesa?';
-  if (!confirm(msg)) return;
-  await closeSession();
-  toast('Mesa cerrada ✓');
+document.getElementById('btn-cerrar').addEventListener('click', () => {
+  if (cart.length > 0) {
+    if (!confirm('Hay items pendientes de envío. ¿Cerrar la mesa igual?')) return;
+  }
+  showPaymentModal();
 });
 
 // ── NAV BUTTONS ───────────────────────────────────────

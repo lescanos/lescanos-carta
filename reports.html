@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Lescano's — Reportes</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--gold:#C9A84C;--dark:#111111;--dark2:#1C1C1C;--gray:#888888;--border:rgba(201,168,76,.18);}
+    html,body{min-height:100%;background:var(--dark);font-family:'Lato',sans-serif;color:#fff;}
+    body{padding-bottom:40px;}
+
+    /* ── HEADER ── */
+    .hdr{
+      background:var(--dark2);border-bottom:1px solid var(--border);
+      padding:13px 16px;display:flex;align-items:center;gap:10px;
+      position:sticky;top:0;z-index:10;
+    }
+    .hdr-brand{font-family:'Playfair Display',serif;font-size:1rem;font-weight:900;color:var(--gold);letter-spacing:.06em;}
+    .hdr-sub{font-size:.58rem;color:var(--gray);letter-spacing:.14em;margin-left:2px;}
+    .hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+    .back-link{
+      background:transparent;border:1px solid rgba(201,168,76,.3);color:rgba(201,168,76,.7);
+      font-size:.6rem;padding:.3rem .6rem;border-radius:4px;cursor:pointer;letter-spacing:.08em;
+      text-decoration:none;
+    }
+
+    /* ── DATE SELECTOR ── */
+    .date-bar{
+      display:flex;align-items:center;gap:10px;padding:10px 16px;
+      border-bottom:1px solid var(--border);background:var(--dark2);
+    }
+    .date-lbl{font-size:.62rem;color:var(--gray);letter-spacing:.1em;text-transform:uppercase;}
+    .date-input{
+      background:rgba(255,255,255,.06);border:1px solid var(--border);
+      color:#fff;font-size:.82rem;padding:6px 10px;border-radius:6px;
+      font-family:'Lato',sans-serif;cursor:pointer;
+    }
+    .date-input::-webkit-calendar-picker-indicator{filter:invert(.6);}
+    .date-nav{
+      background:transparent;border:1px solid var(--border);color:var(--gold);
+      font-size:1rem;width:30px;height:30px;border-radius:6px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .date-nav:active{background:rgba(201,168,76,.1);}
+    .btn-refresh{
+      margin-left:auto;background:transparent;border:1px solid var(--border);
+      color:var(--gold);font-size:.72rem;padding:5px 10px;border-radius:6px;cursor:pointer;
+      letter-spacing:.06em;
+    }
+    .btn-refresh:active{background:rgba(201,168,76,.1);}
+
+    /* ── CONTENT ── */
+    .content{padding:16px;}
+    .section-title{
+      font-size:.58rem;color:var(--gray);letter-spacing:.2em;text-transform:uppercase;
+      margin-bottom:10px;margin-top:20px;
+    }
+    .section-title:first-child{margin-top:0;}
+
+    /* ── STAT CARDS ── */
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;}
+    .stat-card{
+      background:var(--dark2);border:1px solid var(--border);border-radius:12px;
+      padding:14px 10px;text-align:center;
+    }
+    .stat-val{
+      font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;
+      color:var(--gold);line-height:1.1;word-break:break-all;
+    }
+    .stat-lbl{font-size:.52rem;color:var(--gray);letter-spacing:.1em;text-transform:uppercase;margin-top:4px;}
+
+    /* ── PAYMENT BREAKDOWN ── */
+    .pay-breakdown{display:flex;flex-direction:column;gap:6px;}
+    .pay-row{
+      display:flex;align-items:center;gap:10px;
+      background:var(--dark2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;
+    }
+    .pay-row-icon{font-size:1.1rem;flex-shrink:0;}
+    .pay-row-name{flex:1;font-size:.82rem;font-weight:700;color:#ddd;}
+    .pay-row-total{font-family:'Playfair Display',serif;font-size:.88rem;color:var(--gold);font-weight:700;}
+    .pay-row-n{font-size:.62rem;color:var(--gray);margin-left:6px;}
+    .pay-row.zero{opacity:.35;}
+
+    /* ── SESSION LIST ── */
+    .session-list{display:flex;flex-direction:column;gap:6px;}
+    .session-card{
+      background:var(--dark2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+    }
+    .session-card.open{border-color:rgba(201,168,76,.5);}
+    .session-row1{display:flex;align-items:center;gap:8px;}
+    .session-mesa{
+      font-family:'Playfair Display',serif;font-size:.95rem;font-weight:900;
+      color:var(--gold);min-width:52px;
+    }
+    .session-status{
+      font-size:.52rem;padding:2px 7px;border-radius:10px;font-weight:700;letter-spacing:.06em;
+    }
+    .session-status.open{background:rgba(201,168,76,.2);color:var(--gold);}
+    .session-status.closed{background:rgba(255,255,255,.06);color:var(--gray);}
+    .session-time{font-size:.62rem;color:var(--gray);margin-left:auto;}
+    .session-row2{display:flex;align-items:center;gap:8px;margin-top:6px;}
+    .session-metodo{font-size:.68rem;color:#aaa;flex:1;}
+    .session-total{font-family:'Playfair Display',serif;font-size:.9rem;color:var(--gold);font-weight:700;}
+    .session-items-n{font-size:.6rem;color:var(--gray);}
+    .session-empty{
+      text-align:center;padding:20px;color:var(--gray);font-size:.82rem;
+      border:1px dashed rgba(255,255,255,.1);border-radius:10px;
+    }
+
+    /* ── TOP PRODUCTS ── */
+    .top-list{display:flex;flex-direction:column;gap:5px;}
+    .top-row{
+      display:flex;align-items:center;gap:10px;
+      background:var(--dark2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    }
+    .top-rank{
+      font-family:'Playfair Display',serif;font-size:.85rem;font-weight:900;
+      color:rgba(201,168,76,.4);min-width:20px;text-align:center;
+    }
+    .top-rank.top1{color:var(--gold);}
+    .top-nombre{flex:1;font-size:.82rem;color:#ddd;}
+    .top-qty{
+      background:rgba(201,168,76,.15);color:var(--gold);font-size:.72rem;
+      font-weight:700;padding:3px 9px;border-radius:10px;flex-shrink:0;
+    }
+
+    /* ── ACTIONS ── */
+    .actions{display:flex;flex-direction:column;gap:8px;margin-top:24px;}
+    .btn-export{
+      width:100%;padding:13px;background:transparent;color:var(--gold);
+      border:1.5px solid var(--gold);border-radius:10px;font-weight:700;
+      font-size:.88rem;cursor:pointer;letter-spacing:.04em;
+    }
+    .btn-export:active{background:rgba(201,168,76,.1);}
+    .btn-cierre{
+      width:100%;padding:13px;background:#1a3a1a;color:#4caf50;
+      border:1.5px solid rgba(76,175,80,.35);border-radius:10px;font-weight:700;
+      font-size:.88rem;cursor:pointer;letter-spacing:.04em;
+    }
+    .btn-cierre:active{opacity:.8;}
+    .btn-cierre:disabled{opacity:.4;cursor:default;}
+
+    /* ── CIERRE MODAL ── */
+    .cierre-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:50;display:none;align-items:center;justify-content:center;padding:20px;}
+    .cierre-overlay.show{display:flex;}
+    .cierre-box{background:#1a1a1a;border:1px solid rgba(76,175,80,.3);border-radius:16px;padding:24px;width:100%;max-width:420px;}
+    .cierre-title{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:900;color:#4caf50;margin-bottom:4px;}
+    .cierre-sub{font-size:.7rem;color:var(--gray);margin-bottom:16px;}
+    .cierre-textarea{
+      width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);
+      color:#ccc;font-size:.8rem;padding:10px;border-radius:8px;
+      resize:none;height:72px;font-family:'Lato',sans-serif;margin-bottom:12px;
+    }
+    .cierre-btns{display:flex;gap:8px;}
+    .cierre-confirm{
+      flex:1;padding:12px;background:#2a6f2a;color:#fff;border:none;
+      border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;
+    }
+    .cierre-cancel{
+      padding:12px 16px;background:transparent;color:var(--gray);
+      border:1px solid var(--border);border-radius:8px;font-size:.85rem;cursor:pointer;
+    }
+
+    /* ── LOADING / EMPTY ── */
+    .loading{text-align:center;padding:40px 20px;color:var(--gray);font-size:.85rem;}
+    .day-badge{
+      display:inline-block;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);
+      color:var(--gold);font-size:.62rem;padding:2px 8px;border-radius:10px;
+      margin-left:8px;letter-spacing:.06em;vertical-align:middle;
+    }
+  </style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-brand">Lescano's</div>
+  <div class="hdr-sub">— Reportes</div>
+  <div class="hdr-right">
+    <a class="back-link" href="./index.html">← Panel</a>
+  </div>
+</div>
+
+<div class="date-bar">
+  <span class="date-lbl">Fecha</span>
+  <button class="date-nav" id="btn-prev">‹</button>
+  <input type="date" class="date-input" id="date-input">
+  <button class="date-nav" id="btn-next">›</button>
+  <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
+</div>
+
+<div class="content" id="content">
+  <div class="loading">Cargando datos...</div>
+</div>
+
+<!-- ── CIERRE MODAL ── -->
+<div class="cierre-overlay" id="cierre-overlay">
+  <div class="cierre-box">
+    <div class="cierre-title">Cierre de caja</div>
+    <div class="cierre-sub" id="cierre-sub">Resumen del día seleccionado</div>
+    <textarea class="cierre-textarea" id="cierre-notas" placeholder="Notas del cierre (opcional)..."></textarea>
+    <div class="cierre-btns">
+      <button class="cierre-cancel" id="cierre-cancel">Cancelar</button>
+      <button class="cierre-confirm" id="cierre-confirm">Confirmar cierre</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────
+const SB_URL = 'https://hfayvobhkkkdrijzsmtk.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmYXl2b2Joa2trZHJpanpzbXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Njg2NTgsImV4cCI6MjA5NjQ0NDY1OH0.baQL05XahRraU88bmTuni1Uh0rBN9IqbET98DM_g4Os';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+const METODOS_INFO = {
+  efectivo:      { label:'Efectivo',      icon:'💵' },
+  debito:        { label:'Débito',         icon:'💳' },
+  credito:       { label:'Crédito',        icon:'🏦' },
+  transferencia: { label:'Transferencia',  icon:'📱' },
+  mercadopago:   { label:'Mercado Pago',   icon:'🔵' },
+  pedidosya:     { label:'Pedidos Ya',     icon:'🛵' },
+};
+
+// ── DATE HELPERS ──────────────────────────────────────
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+function parseDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function formatDate(s) {
+  const d = parseDate(s);
+  return d.toLocaleDateString('es-AR', {weekday:'long',day:'numeric',month:'long'});
+}
+function isToday(s) { return s === toDateStr(new Date()); }
+
+// ── STATE ─────────────────────────────────────────────
+let currentDate = toDateStr(new Date());
+let reportData  = null;
+
+// ── DATE CONTROLS ─────────────────────────────────────
+const dateInput = document.getElementById('date-input');
+dateInput.value = currentDate;
+dateInput.max   = currentDate;
+
+dateInput.addEventListener('change', () => {
+  currentDate = dateInput.value;
+  loadReport();
+});
+document.getElementById('btn-prev').addEventListener('click', () => {
+  const d = parseDate(currentDate);
+  d.setDate(d.getDate() - 1);
+  currentDate = toDateStr(d);
+  dateInput.value = currentDate;
+  loadReport();
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  const d = parseDate(currentDate);
+  d.setDate(d.getDate() + 1);
+  const next = toDateStr(d);
+  if (next > toDateStr(new Date())) return;
+  currentDate = next;
+  dateInput.value = currentDate;
+  loadReport();
+});
+document.getElementById('btn-refresh').addEventListener('click', loadReport);
+
+// ── LOAD DATA ─────────────────────────────────────────
+async function loadReport() {
+  document.getElementById('content').innerHTML = '<div class="loading">Cargando...</div>';
+
+  const dayStart = `${currentDate}T00:00:00`;
+  const dayEnd   = `${currentDate}T23:59:59`;
+
+  try {
+    // Sesiones abiertas o creadas en el día
+    const { data: sessions } = await sb.from('sesiones')
+      .select('*, pagos(*)')
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd)
+      .order('created_at', { ascending: true });
+
+    // También sesiones de días anteriores que se cerraron hoy
+    const { data: closedToday } = await sb.from('sesiones')
+      .select('*, pagos(*)')
+      .gte('closed_at', dayStart)
+      .lte('closed_at', dayEnd)
+      .lt('created_at', dayStart);
+
+    const allSessions = [
+      ...(sessions || []),
+      ...(closedToday || []).filter(s => !(sessions||[]).find(x => x.id === s.id))
+    ];
+
+    // Items de todas las sesiones del día
+    const sessionIds = allSessions.map(s => s.id);
+    let allItems = [];
+    if (sessionIds.length > 0) {
+      const { data: items } = await sb.from('pedido_items')
+        .select('*')
+        .in('sesion_id', sessionIds);
+      allItems = items || [];
+    }
+
+    // Cierre de caja de hoy (si existe)
+    const { data: cierres } = await sb.from('cierres')
+      .select('*')
+      .eq('fecha', currentDate)
+      .limit(1);
+
+    reportData = { allSessions, allItems, cierre: cierres?.[0] || null };
+    renderReport();
+  } catch(e) {
+    document.getElementById('content').innerHTML =
+      `<div class="loading">Error al cargar datos. Verificá la conexión.</div>`;
+    console.error(e);
+  }
+}
+
+// ── RENDER REPORT ─────────────────────────────────────
+function renderReport() {
+  const { allSessions, allItems, cierre } = reportData;
+  const closedSessions = allSessions.filter(s => s.estado === 'cerrada');
+  const openSessions   = allSessions.filter(s => s.estado === 'abierta');
+
+  // Totales
+  const totalVentas   = closedSessions.reduce((s, sess) => {
+    const pago = sess.pagos?.[0];
+    return s + (pago ? Number(pago.monto) : 0);
+  }, 0);
+  const ticketPromedio = closedSessions.length > 0 ? Math.round(totalVentas / closedSessions.length) : 0;
+
+  // Por método de pago
+  const byMetodo = {};
+  Object.keys(METODOS_INFO).forEach(k => { byMetodo[k] = { total: 0, count: 0 }; });
+  closedSessions.forEach(sess => {
+    const pago = sess.pagos?.[0];
+    if (pago && byMetodo[pago.metodo]) {
+      byMetodo[pago.metodo].total += Number(pago.monto);
+      byMetodo[pago.metodo].count++;
+    }
+  });
+
+  // Top productos (de sesiones cerradas del día)
+  const closedIds = new Set(closedSessions.map(s => s.id));
+  const itemCount = {};
+  allItems.filter(i => closedIds.has(i.sesion_id)).forEach(item => {
+    const key = item.nombre;
+    itemCount[key] = (itemCount[key] || 0) + item.qty;
+  });
+  const topProducts = Object.entries(itemCount)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 8);
+
+  // Render
+  const todayBadge = isToday(currentDate) ? '<span class="day-badge">HOY</span>' : '';
+  let h = '';
+
+  // ── Summary ──
+  h += `<div class="section-title">${formatDate(currentDate)} ${todayBadge}</div>`;
+  h += `<div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-val">${totalVentas > 0 ? '$'+Math.round(totalVentas/1000)+'k' : '—'}</div>
+      <div class="stat-lbl">Total ventas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${closedSessions.length}</div>
+      <div class="stat-lbl">Mesas cerradas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${ticketPromedio > 0 ? '$'+Math.round(ticketPromedio/1000)+'k' : '—'}</div>
+      <div class="stat-lbl">Ticket promedio</div>
+    </div>
+  </div>`;
+
+  // ── Payment breakdown ──
+  h += `<div class="section-title" style="margin-top:18px">Por método de pago</div>`;
+  h += `<div class="pay-breakdown">`;
+  Object.entries(METODOS_INFO).forEach(([id, info]) => {
+    const data = byMetodo[id];
+    const isEmpty = data.count === 0;
+    h += `<div class="pay-row${isEmpty?' zero':''}">
+      <div class="pay-row-icon">${info.icon}</div>
+      <div class="pay-row-name">${info.label}</div>
+      <div class="pay-row-total">${data.total > 0 ? '$'+data.total.toLocaleString('es-AR') : '—'}</div>
+      ${data.count > 0 ? `<span class="pay-row-n">${data.count} mesa${data.count!==1?'s':''}</span>` : ''}
+    </div>`;
+  });
+  h += `</div>`;
+
+  // ── Open sessions ──
+  if (openSessions.length > 0) {
+    h += `<div class="section-title" style="margin-top:18px">Mesas abiertas ahora (${openSessions.length})</div>`;
+    h += `<div class="session-list">`;
+    openSessions.forEach(sess => {
+      const desde = new Date(sess.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      const itemsN = allItems.filter(i => i.sesion_id === sess.id).reduce((s,i)=>s+i.qty,0);
+      const subtotal = allItems.filter(i => i.sesion_id === sess.id).reduce((s,i) => s + parsePrecio(i.precio)*i.qty, 0);
+      const mesaLbl = sess.mesa === 'llevar' ? 'Para llevar' : `Mesa ${sess.mesa.replace('mesa_','')}`;
+      h += `<div class="session-card open">
+        <div class="session-row1">
+          <div class="session-mesa">${mesaLbl}</div>
+          <span class="session-status open">ABIERTA</span>
+          <div class="session-time">desde ${desde}</div>
+        </div>
+        <div class="session-row2">
+          <span class="session-items-n">${itemsN} item${itemsN!==1?'s':''} enviados</span>
+          ${subtotal > 0 ? `<div class="session-total">~$${subtotal.toLocaleString('es-AR')}</div>` : ''}
+        </div>
+      </div>`;
+    });
+    h += `</div>`;
+  }
+
+  // ── Closed sessions ──
+  h += `<div class="section-title" style="margin-top:18px">Mesas cerradas (${closedSessions.length})</div>`;
+  if (closedSessions.length === 0) {
+    h += `<div class="session-empty">No hay mesas cerradas en esta fecha.</div>`;
+  } else {
+    h += `<div class="session-list">`;
+    closedSessions.slice().reverse().forEach(sess => {
+      const abierta = new Date(sess.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      const cerrada = sess.closed_at
+        ? new Date(sess.closed_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
+        : '—';
+      const pago = sess.pagos?.[0];
+      const itemsN = allItems.filter(i => i.sesion_id === sess.id).reduce((s,i)=>s+i.qty,0);
+      const metodInfo = pago ? METODOS_INFO[pago.metodo] : null;
+      const mesaLbl = sess.mesa === 'llevar' ? 'Para llevar' : `Mesa ${sess.mesa.replace('mesa_','')}`;
+      h += `<div class="session-card">
+        <div class="session-row1">
+          <div class="session-mesa">${mesaLbl}</div>
+          <span class="session-status closed">CERRADA</span>
+          <div class="session-time">${abierta} → ${cerrada}</div>
+        </div>
+        <div class="session-row2">
+          <span class="session-metodo">${metodInfo ? metodInfo.icon+' '+metodInfo.label : 'Sin pago registrado'}</span>
+          <span class="session-items-n">${itemsN} item${itemsN!==1?'s':''}</span>
+          ${pago?.monto > 0 ? `<div class="session-total">$${Number(pago.monto).toLocaleString('es-AR')}</div>` : ''}
+        </div>
+      </div>`;
+    });
+    h += `</div>`;
+  }
+
+  // ── Top products ──
+  if (topProducts.length > 0) {
+    h += `<div class="section-title" style="margin-top:18px">Productos más pedidos</div>`;
+    h += `<div class="top-list">`;
+    topProducts.forEach(([nombre, qty], i) => {
+      h += `<div class="top-row">
+        <div class="top-rank${i===0?' top1':''}">${i+1}</div>
+        <div class="top-nombre">${esc(nombre)}</div>
+        <div class="top-qty">${qty}×</div>
+      </div>`;
+    });
+    h += `</div>`;
+  }
+
+  // ── Actions ──
+  h += `<div class="actions">`;
+  if (closedSessions.length > 0) {
+    h += `<button class="btn-export" id="btn-export">📊 Exportar CSV del día</button>`;
+  }
+  const cierreYaHecho = !!cierre;
+  h += `<button class="btn-cierre" id="btn-cierre" ${cierreYaHecho?'disabled':''}>
+    ${cierreYaHecho ? '✓ Cierre de caja registrado' : '🔒 Realizar cierre de caja'}
+  </button>`;
+  h += `</div>`;
+
+  document.getElementById('content').innerHTML = h;
+
+  // Bind action buttons
+  document.getElementById('btn-export')?.addEventListener('click', exportCSV);
+  document.getElementById('btn-cierre')?.addEventListener('click', showCierreModal);
+}
+
+// ── EXPORT CSV ────────────────────────────────────────
+function exportCSV() {
+  const { allSessions, allItems } = reportData;
+  const closed = allSessions.filter(s => s.estado === 'cerrada');
+
+  let csv = '﻿'; // BOM para Excel
+  csv += 'Fecha,Mesa,Apertura,Cierre,Método de pago,Total\n';
+  closed.forEach(sess => {
+    const pago = sess.pagos?.[0];
+    const abierta = new Date(sess.created_at).toLocaleString('es-AR');
+    const cerrada  = sess.closed_at ? new Date(sess.closed_at).toLocaleString('es-AR') : '';
+    const mesaLbl  = sess.mesa === 'llevar' ? 'Para llevar' : `Mesa ${sess.mesa.replace('mesa_','')}`;
+    const metodo   = pago ? METODOS_INFO[pago.metodo]?.label || pago.metodo : '';
+    const monto    = pago ? Number(pago.monto) : 0;
+    csv += `"${currentDate}","${mesaLbl}","${abierta}","${cerrada}","${metodo}","${monto}"\n`;
+  });
+
+  csv += '\n';
+  csv += 'Fecha,Producto,Sección,Precio,Cantidad\n';
+  const closedIds = new Set(closed.map(s => s.id));
+  allItems.filter(i => closedIds.has(i.sesion_id)).forEach(item => {
+    csv += `"${currentDate}","${item.nombre}","${item.seccion||''}","${item.precio}","${item.qty}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `lescanos-${currentDate}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── CIERRE DE CAJA ────────────────────────────────────
+let pendingCierreData = null;
+
+function showCierreModal() {
+  const { allSessions } = reportData;
+  const closed = allSessions.filter(s => s.estado === 'cerrada');
+
+  const totals = { total:0, efectivo:0, debito:0, credito:0, transferencia:0, mercadopago:0, pedidosya:0 };
+  closed.forEach(sess => {
+    const pago = sess.pagos?.[0];
+    if (pago && pago.metodo in totals) {
+      totals[pago.metodo] += Number(pago.monto);
+      totals.total += Number(pago.monto);
+    }
+  });
+
+  pendingCierreData = totals;
+  document.getElementById('cierre-sub').textContent =
+    `${formatDate(currentDate)} — Total: $${totals.total.toLocaleString('es-AR')}`;
+  document.getElementById('cierre-notas').value = '';
+  document.getElementById('cierre-overlay').classList.add('show');
+}
+
+document.getElementById('cierre-cancel').addEventListener('click', () => {
+  document.getElementById('cierre-overlay').classList.remove('show');
+});
+
+document.getElementById('cierre-confirm').addEventListener('click', async () => {
+  if (!pendingCierreData) return;
+  const notas = document.getElementById('cierre-notas').value.trim();
+  document.getElementById('cierre-overlay').classList.remove('show');
+
+  try {
+    await sb.from('cierres').insert({
+      fecha:          currentDate,
+      total:          pendingCierreData.total,
+      efectivo:       pendingCierreData.efectivo,
+      debito:         pendingCierreData.debito,
+      credito:        pendingCierreData.credito,
+      transferencia:  pendingCierreData.transferencia,
+      mercadopago:    pendingCierreData.mercadopago,
+      pedidosya:      pendingCierreData.pedidosya,
+      notas:          notas || null,
+    });
+    loadReport();
+  } catch(e) {
+    console.error('Error guardando cierre:', e);
+    alert('Error al guardar el cierre. Intentá de nuevo.');
+  }
+});
+
+// ── UTILS ─────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function parsePrecio(p) { return parseInt((p||'').replace(/\D/g,'')) || 0; }
+
+// ── INIT ──────────────────────────────────────────────
+loadReport();
+</script>
+</body>
+</html>
