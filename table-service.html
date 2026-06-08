@@ -747,9 +747,9 @@ function renderMenuContent() {
   } else {
     page.secciones.forEach((sec, si) => {
       h += `<div class="sec-hdr">
-        <span>${sec.emoji}</span>
-        <span class="sec-title">${sec.titulo}</span>
-        ${sec.nota ? `<span class="sec-nota">${sec.nota}</span>` : ''}
+        <span>${esc(sec.emoji||'')}</span>
+        <span class="sec-title">${esc(sec.titulo)}</span>
+        ${sec.nota ? `<span class="sec-nota">${esc(sec.nota)}</span>` : ''}
       </div>`;
       sec.items.forEach((item, ii) => {
         const baseId = `p${pageIdx}s${si}i${ii}`;

@@ -446,7 +446,7 @@ function renderReport() {
         </div>
         <div class="session-row2">
           <span class="session-metodo">${metodInfo ? metodInfo.icon+' '+metodInfo.label : 'Sin pago registrado'}</span>
-          ${sess.moza_nombre ? '<span style="font-size:.62rem;color:var(--gold);opacity:.7;">'+sess.moza_nombre+'</span>' : ''}
+          ${sess.moza_nombre ? '<span style="font-size:.62rem;color:var(--gold);opacity:.7;">'+esc(sess.moza_nombre)+'</span>' : ''}
           <span class="session-items-n">${itemsN} item${itemsN!==1?'s':''} · ${sess.cubiertos||1} cub.</span>
           ${pago?.monto > 0 ? `<div class="session-total">$${Number(pago.monto).toLocaleString('es-AR')}</div>` : ''}
         </div>
