@@ -47,6 +47,27 @@
       display:flex;align-items:center;justify-content:center;padding:0 7px;
     }
 
+    /* ── CUBIERTOS EN HEADER ── */
+    .hdr-cub{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-right:6px;}
+    .hdr-cub-btn{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(201,168,76,.4);
+      background:transparent;color:var(--gold);font-size:1rem;line-height:1;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;}
+    .hdr-cub-btn:active{background:rgba(201,168,76,.15);}
+    .hdr-cub-info{text-align:center;line-height:1.2;}
+    .hdr-cub-num{font-size:.78rem;font-weight:700;color:#fff;min-width:14px;}
+    .hdr-cub-lbl{font-size:.5rem;color:var(--gray);letter-spacing:.08em;}
+
+    /* ── BANNER PEDIDO LISTO ── */
+    .listo-banner{position:fixed;top:0;left:0;right:0;background:#1a7a1a;
+      color:#fff;padding:14px 18px;z-index:999;display:none;
+      align-items:center;justify-content:space-between;gap:12px;
+      font-size:.85rem;font-weight:700;letter-spacing:.03em;
+      box-shadow:0 2px 12px rgba(0,0,0,.4);}
+    .listo-banner.show{display:flex;animation:slideDown .25s ease;}
+    @keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+    .listo-close{background:transparent;border:none;color:rgba(255,255,255,.7);
+      font-size:1.3rem;cursor:pointer;padding:0 2px;line-height:1;}
+
     /* ── SCREEN: MESAS ── */
     .mesa-heading{
       padding:14px 16px 6px;font-size:.65rem;color:var(--gray);
@@ -306,11 +327,25 @@
     <div class="mesa-grid" id="mesa-grid"></div>
   </div>
 
+  <!-- ── BANNER PEDIDO LISTO ── -->
+  <div class="listo-banner" id="listo-banner">
+    <span id="listo-banner-txt">🍽️ Pedido listo</span>
+    <button class="listo-close" id="listo-close">✕</button>
+  </div>
+
   <!-- ── MENU ── -->
   <div class="screen" id="screen-menu">
     <div class="hdr">
       <button class="back-btn" id="back-mesas">‹</button>
       <div class="hdr-mesa" id="hdr-mesa">Mesa 1</div>
+      <div class="hdr-cub" id="hdr-cub">
+        <button class="hdr-cub-btn" id="cub-hdr-minus">−</button>
+        <div class="hdr-cub-info">
+          <div class="hdr-cub-num" id="cub-hdr-num">1</div>
+          <div class="hdr-cub-lbl">cub</div>
+        </div>
+        <button class="hdr-cub-btn" id="cub-hdr-plus">+</button>
+      </div>
       <div class="cart-pill" id="cart-pill">0</div>
     </div>
     <div class="page-tabs" id="page-tabs"></div>
@@ -416,6 +451,8 @@ let sessionItems     = [];    // items ya enviados en esta sesión
 let openSessions     = {};    // { 'mesa_1': session, ... }
 let noteEditIdx      = null;  // índice en cart del item con nota abierta
 let selectedCubiertos = 1;   // cubiertos para el cierre de mesa
+let hdrCubiertos     = 1;    // cubiertos visibles en el header del menú
+let listoChannel     = null; // canal Realtime para notif "pedido listo"
 let currentUser      = null;  // { id, nombre, rol }
 
 // ── LOCALSTORAGE (fallback sin conexión) ──────────────
@@ -471,6 +508,8 @@ async function openOrLoadSession(mesaId) {
       currentSession = created;
       sessionItems = [];
     }
+    initCubiertosHdr();
+    subscribeListoNotifs();
   } catch(e) {
     console.error('Supabase:', e);
     currentSession = null;
@@ -488,6 +527,61 @@ async function loadSessionItems() {
     sessionItems = data || [];
   } catch(e) { sessionItems = []; }
 }
+
+// ── CUBIERTOS EN HEADER ───────────────────────────────
+function initCubiertosHdr() {
+  hdrCubiertos = currentSession?.cubiertos || 1;
+  document.getElementById('cub-hdr-num').textContent = hdrCubiertos;
+}
+
+async function setCubiertosHdr(n) {
+  hdrCubiertos = Math.max(1, n);
+  document.getElementById('cub-hdr-num').textContent = hdrCubiertos;
+  if (currentSession) {
+    try { await sb.from('sesiones').update({ cubiertos: hdrCubiertos }).eq('id', currentSession.id); }
+    catch(e) {}
+  }
+}
+
+document.getElementById('cub-hdr-minus').addEventListener('click', () => setCubiertosHdr(hdrCubiertos - 1));
+document.getElementById('cub-hdr-plus').addEventListener('click',  () => setCubiertosHdr(hdrCubiertos + 1));
+
+// ── NOTIFICACIÓN PEDIDO LISTO ─────────────────────────
+async function subscribeListoNotifs() {
+  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
+  if (!currentSession) return;
+  listoChannel = sb.channel(`listo-${currentSession.id}`)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'pedidos',
+      filter: `sesion_id=eq.${currentSession.id}`
+    }, payload => {
+      if (payload.new?.estado === 'listo') showListoNotif();
+    })
+    .subscribe();
+}
+
+function showListoNotif() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      gain.gain.setValueAtTime(.3, ctx.currentTime + i * .18);
+      gain.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + i * .18 + .28);
+      osc.start(ctx.currentTime + i * .18);
+      osc.stop(ctx.currentTime + i * .18 + .28);
+    });
+  } catch(e) {}
+  const banner = document.getElementById('listo-banner');
+  document.getElementById('listo-banner-txt').textContent = `🍽️ Pedido listo — ${mesaLabel()}`;
+  banner.classList.add('show');
+  setTimeout(() => banner.classList.remove('show'), 9000);
+}
+
+document.getElementById('listo-close').addEventListener('click', () => {
+  document.getElementById('listo-banner').classList.remove('show');
+});
 
 async function saveOrderToSupabase() {
   if (!currentSession || cart.length === 0) return false;
@@ -555,7 +649,7 @@ let selectedPayMethod = null;
 
 function showPaymentModal() {
   selectedPayMethod = null;
-  selectedCubiertos = currentSession?.cubiertos || 1;
+  selectedCubiertos = hdrCubiertos; // ya guardado en Supabase desde el header
   document.getElementById('pay-mesa-lbl').textContent = mesaLabel();
   document.getElementById('cub-num').textContent = selectedCubiertos;
   const total = grandTotal();
@@ -1039,7 +1133,12 @@ document.getElementById('btn-cerrar').addEventListener('click', () => {
 
 // ── NAV BUTTONS ───────────────────────────────────────
 document.getElementById('back-mesas').addEventListener('click', async () => {
-  // No cerramos la sesión — la mesa queda abierta
+  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
+  document.getElementById('listo-banner').classList.remove('show');
+  // Si la sesión no tiene ningún item enviado ni en carrito, borrarla (se abrió por error)
+  if (currentSession && cart.length === 0 && sessionItems.length === 0) {
+    try { await sb.from('sesiones').delete().eq('id', currentSession.id); } catch(e) {}
+  }
   mesa = null; cart = []; currentSession = null; sessionItems = [];
   await renderMesas();
   showScreen('mesas');
