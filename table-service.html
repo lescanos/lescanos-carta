@@ -391,7 +391,7 @@
 <script>
 // ── CONFIG ──────────────────────────────────────────
 const WA_NUMBER  = '__WA_NUMBER__';
-const NUM_MESAS  = +'__NUM_MESAS__';
+let numMesas = 8; // loaded from Supabase config table
 const SB_URL     = 'https://hfayvobhkkkdrijzsmtk.supabase.co';
 const SB_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmYXl2b2Joa2trZHJpanpzbXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4Njg2NTgsImV4cCI6MjA5NjQ0NDY1OH0.baQL05XahRraU88bmTuni1Uh0rBN9IqbET98DM_g4Os';
 
@@ -664,7 +664,7 @@ function showScreen(name) {
 async function renderMesas() {
   await loadOpenSessions();
   let h = '';
-  for (let i = 1; i <= NUM_MESAS; i++) {
+  for (let i = 1; i <= numMesas; i++) {
     const key = `mesa_${i}`;
     const active = !!openSessions[key];
     h += `<div class="mesa-btn${active?' has-session':''}" data-mesa="${key}">
@@ -1058,6 +1058,14 @@ function esc(s) {
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── CONFIG ────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const { data } = await sb.from('config').select('clave,valor').eq('clave','num_mesas').single();
+    if (data) numMesas = parseInt(data.valor) || 8;
+  } catch(e) { /* use default */ }
+}
+
 // ── INIT ──────────────────────────────────────────────
 async function doLogout() {
   await sb.auth.signOut();
@@ -1073,6 +1081,7 @@ async function doLogout() {
   }
   currentUser = { id: session.user.id, nombre: perfil.nombre, rol: perfil.rol };
   document.getElementById('hdr-user').textContent = currentUser.nombre;
+  await loadConfig();
   renderMesas();
   showScreen('mesas');
 })();

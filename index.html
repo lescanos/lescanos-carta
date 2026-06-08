@@ -154,6 +154,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
 .hub-card-label{font-size:.78rem;font-weight:700;color:#fff;letter-spacing:.04em;margin-bottom:.25rem;}
 .hub-card-desc{font-size:.6rem;color:var(--gray);line-height:1.4;}
 .hub-exit{font-size:.62rem;color:var(--gray);cursor:pointer;text-decoration:underline;margin-top:.5rem;}
+.hub-settings{display:flex;align-items:center;gap:.65rem;background:#1A1A1A;
+  border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:.65rem 1rem;
+  width:100%;max-width:480px;flex-wrap:wrap;}
+.hub-settings-lbl{font-size:.6rem;color:var(--gray);letter-spacing:.1em;white-space:nowrap;flex:1;}
+.hub-settings input[type=number]{background:#111;border:1px solid rgba(201,168,76,.3);color:var(--gold);
+  font-size:.95rem;font-weight:700;width:56px;padding:.28rem .4rem;border-radius:5px;
+  outline:none;text-align:center;font-family:'Lato',sans-serif;}
+.hub-settings input[type=number]:focus{border-color:var(--gold);}
+.hub-settings-save{background:transparent;border:1px solid rgba(201,168,76,.4);color:var(--gold);
+  font-size:.62rem;padding:.3rem .65rem;border-radius:5px;cursor:pointer;letter-spacing:.08em;}
+.hub-settings-save:hover{background:rgba(201,168,76,.1);}
 
 /* ── MULTI-PRICE TABLE ── */
 .price-table{display:flex;gap:.3rem;flex-shrink:0;align-items:flex-end;}
@@ -213,6 +224,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);
       <div class="hub-card-label">Cocina</div>
       <div class="hub-card-desc">Pedidos en tiempo real para la pantalla de cocina</div>
     </div>
+  </div>
+  <div class="hub-settings">
+    <span class="hub-settings-lbl">CANTIDAD DE MESAS</span>
+    <input type="number" id="cfg-mesas" min="1" max="30" value="8">
+    <button class="hub-settings-save" onclick="saveMesasConfig()">Guardar</button>
+    <span id="cfg-save-msg" style="font-size:.65rem;color:var(--gold);opacity:0;transition:opacity .4s;">✓ guardado</span>
   </div>
   <span class="hub-exit" onclick="exitAdmin()">Cerrar sesión</span>
 </div>
@@ -417,6 +434,23 @@ function showHub(nombre){
   document.getElementById('admin-view').classList.remove('active');
   document.getElementById('carta-view').style.display='none';
   if(nombre)document.getElementById('hub-user').textContent=nombre.toUpperCase();
+  loadConfig();
+}
+async function loadConfig(){
+  try{
+    const {data}=await sb.from('config').select('clave,valor').eq('clave','num_mesas').single();
+    if(data)document.getElementById('cfg-mesas').value=data.valor;
+  }catch(e){}
+}
+async function saveMesasConfig(){
+  const val=parseInt(document.getElementById('cfg-mesas').value);
+  if(!val||val<1||val>30)return;
+  try{
+    await sb.from('config').upsert({clave:'num_mesas',valor:String(val),updated_at:new Date().toISOString()});
+    const msg=document.getElementById('cfg-save-msg');
+    msg.style.opacity='1';
+    setTimeout(()=>msg.style.opacity='0',2500);
+  }catch(e){}
 }
 function showAdmin(){
   document.getElementById('admin-view').classList.add('active');

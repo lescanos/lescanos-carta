@@ -1,6 +1,8 @@
-import os, sys
+"""Inyecta secrets de GitHub Actions en los archivos del dist antes de publicar."""
+import os
+import sys
 
-required = ['WA_NUMBER', 'NUM_MESAS', 'MENU_TOKEN']
+required = ['WA_NUMBER', 'MENU_TOKEN']
 secrets = {}
 
 for key in required:
@@ -16,7 +18,6 @@ replacements = {
     ],
     'dist/table-service.html': [
         ('__WA_NUMBER__', secrets['WA_NUMBER']),
-        ('__NUM_MESAS__', secrets['NUM_MESAS']),
     ],
 }
 
