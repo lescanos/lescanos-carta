@@ -210,6 +210,34 @@
     .m-price-col-val{font-family:'Playfair Display',serif;font-size:.78rem;color:var(--gold);font-weight:700;white-space:nowrap;text-align:center;}
     .r-rm{background:transparent;border:none;color:rgba(255,80,80,.45);font-size:1.1rem;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1;}
     .r-rm:active{color:rgba(255,80,80,.9);}
+    .r-info{flex:1;min-width:0;}
+    .r-nombre{font-size:.9rem;color:#fff;font-weight:500;}
+    .r-nota{font-size:.65rem;color:var(--gray);font-style:italic;margin-top:2px;line-height:1.3;}
+    .r-nota-link{font-size:.6rem;color:rgba(201,168,76,.5);cursor:pointer;margin-top:3px;letter-spacing:.03em;border:none;background:transparent;padding:0;font-family:'Lato',sans-serif;display:inline-block;}
+    .r-nota-link:active{color:var(--gold);}
+
+    /* ── CUBIERTOS (en modal de pago) ── */
+    .pay-cubiertos-wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.06);}
+    .pay-cubiertos-lbl{font-size:.6rem;color:var(--gray);letter-spacing:.14em;text-transform:uppercase;}
+    .pay-cubiertos-ctrl{display:flex;align-items:center;gap:16px;}
+    .pay-cub-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(201,168,76,.4);background:transparent;color:var(--gold);font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;flex-shrink:0;}
+    .pay-cub-btn:active{background:rgba(201,168,76,.15);}
+    .pay-cub-num{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;color:var(--gold);min-width:28px;text-align:center;}
+
+    /* ── NOTE MODAL ── */
+    .note-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:70;display:none;align-items:flex-end;}
+    .note-overlay.show{display:flex;}
+    .note-sheet{width:100%;background:#1C1C1C;border-radius:18px 18px 0 0;border-top:1px solid rgba(201,168,76,.25);padding:8px 0 0;}
+    .note-handle{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:0 auto 14px;}
+    .note-item-name{font-size:.88rem;font-weight:700;color:#fff;padding:0 20px 4px;text-align:center;}
+    .note-title{font-size:.58rem;color:var(--gray);letter-spacing:.16em;text-align:center;padding:0 20px 10px;border-bottom:1px solid rgba(255,255,255,.06);}
+    .note-input{width:calc(100% - 28px);margin:14px 14px 0;background:rgba(255,255,255,.06);border:1px solid var(--border);color:#fff;font-size:.9rem;padding:10px 12px;border-radius:10px;font-family:'Lato',sans-serif;resize:none;height:76px;display:block;-webkit-appearance:none;}
+    .note-input::placeholder{color:var(--gray);}
+    .note-input:focus{outline:none;border-color:rgba(201,168,76,.5);}
+    .note-save{width:calc(100% - 28px);margin:10px 14px 0;padding:13px;background:var(--gold);color:var(--dark);font-weight:700;font-size:.9rem;border:none;border-radius:10px;cursor:pointer;letter-spacing:.04em;display:block;}
+    .note-save:active{opacity:.85;}
+    .note-clear{width:calc(100% - 28px);margin:8px 14px 28px;padding:10px;background:transparent;color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:.8rem;cursor:pointer;letter-spacing:.04em;display:block;}
+    .note-clear:active{background:rgba(255,255,255,.05);}
 
     /* ── PAYMENT MODAL ── */
     .pay-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:60;display:none;align-items:flex-end;}
@@ -326,6 +354,14 @@
     <div class="pay-handle"></div>
     <div class="pay-title">Cerrar mesa</div>
     <div class="pay-mesa-lbl" id="pay-mesa-lbl">Mesa 1</div>
+    <div class="pay-cubiertos-wrap">
+      <div class="pay-cubiertos-lbl">Cubiertos</div>
+      <div class="pay-cubiertos-ctrl">
+        <button class="pay-cub-btn" id="cub-minus">−</button>
+        <span class="pay-cub-num" id="cub-num">1</span>
+        <button class="pay-cub-btn" id="cub-plus">+</button>
+      </div>
+    </div>
     <div class="pay-total-wrap">
       <div class="pay-total-lbl">Total de la cuenta</div>
       <div class="pay-total-val" id="pay-total">$0</div>
@@ -334,6 +370,18 @@
     <div class="pay-grid" id="pay-grid"></div>
     <button class="pay-confirm" id="pay-confirm" disabled>Confirmar cierre</button>
     <button class="pay-cancel" id="pay-cancel">Cancelar</button>
+  </div>
+</div>
+
+<!-- ── NOTE MODAL ── -->
+<div class="note-overlay" id="note-overlay">
+  <div class="note-sheet">
+    <div class="note-handle"></div>
+    <div class="note-item-name" id="note-item-name"></div>
+    <div class="note-title">NOTA PARA COCINA</div>
+    <textarea class="note-input" id="note-input" placeholder="Ej: sin cebolla, bien cocido, sin sal..."></textarea>
+    <button class="note-save" id="note-save">Guardar nota</button>
+    <button class="note-clear" id="note-clear">Quitar nota</button>
   </div>
 </div>
 
@@ -358,13 +406,15 @@ function getMenu() {
 }
 
 // ── STATE ─────────────────────────────────────────────
-let mesa           = null;
-let cart           = [];
-let pageIdx        = 0;
-let itemsMap       = {};
-let currentSession = null;   // sesión activa en Supabase
-let sessionItems   = [];     // items ya enviados en esta sesión
-let openSessions   = {};     // { 'mesa_1': session, ... }
+let mesa             = null;
+let cart             = [];
+let pageIdx          = 0;
+let itemsMap         = {};
+let currentSession   = null;  // sesión activa en Supabase
+let sessionItems     = [];    // items ya enviados en esta sesión
+let openSessions     = {};    // { 'mesa_1': session, ... }
+let noteEditIdx      = null;  // índice en cart del item con nota abierta
+let selectedCubiertos = 1;   // cubiertos para el cierre de mesa
 
 // ── LOCALSTORAGE (fallback sin conexión) ──────────────
 const lsKey = () => mesa === 'llevar' ? 'lescanos_order_llevar' : `lescanos_order_${mesa}`;
@@ -450,6 +500,7 @@ async function saveOrderToSupabase() {
       nombre:    c.nombre,
       precio:    c.precio,
       qty:       c.qty,
+      nota:      c.nota  || null,
       pagina:    c.pagina  || '',
       seccion:   c.seccion || ''
     }));
@@ -465,14 +516,14 @@ async function saveOrderToSupabase() {
   }
 }
 
-async function closeSession(metodo, monto) {
+async function closeSession(metodo, monto, cubiertos) {
   if (!currentSession) {
     currentSession = null; sessionItems = []; cart = []; cartClear();
     await loadOpenSessions(); renderMesas(); showScreen('mesas'); return;
   }
   try {
     await sb.from('sesiones')
-      .update({ estado: 'cerrada', closed_at: new Date().toISOString() })
+      .update({ estado: 'cerrada', closed_at: new Date().toISOString(), cubiertos: cubiertos || 1 })
       .eq('id', currentSession.id);
     if (metodo) {
       await sb.from('pagos').insert({
@@ -502,7 +553,9 @@ let selectedPayMethod = null;
 
 function showPaymentModal() {
   selectedPayMethod = null;
+  selectedCubiertos = currentSession?.cubiertos || 1;
   document.getElementById('pay-mesa-lbl').textContent = mesaLabel();
+  document.getElementById('cub-num').textContent = selectedCubiertos;
   const total = grandTotal();
   document.getElementById('pay-total').textContent =
     total > 0 ? `$${total.toLocaleString('es-AR')}` : '—';
@@ -515,6 +568,17 @@ function showPaymentModal() {
   document.getElementById('pay-confirm').disabled = true;
   document.getElementById('pay-overlay').classList.add('show');
 }
+
+document.getElementById('cub-minus').addEventListener('click', () => {
+  if (selectedCubiertos > 1) {
+    selectedCubiertos--;
+    document.getElementById('cub-num').textContent = selectedCubiertos;
+  }
+});
+document.getElementById('cub-plus').addEventListener('click', () => {
+  selectedCubiertos++;
+  document.getElementById('cub-num').textContent = selectedCubiertos;
+});
 
 document.getElementById('pay-grid').addEventListener('click', e => {
   const btn = e.target.closest('[data-metodo]');
@@ -529,12 +593,41 @@ document.getElementById('pay-confirm').addEventListener('click', async () => {
   if (!selectedPayMethod) return;
   document.getElementById('pay-overlay').classList.remove('show');
   const monto = grandTotal();
-  await closeSession(selectedPayMethod, monto);
+  await closeSession(selectedPayMethod, monto, selectedCubiertos);
   toast('Mesa cerrada ✓');
 });
 
 document.getElementById('pay-cancel').addEventListener('click', () => {
   document.getElementById('pay-overlay').classList.remove('show');
+});
+
+// ── NOTE MODAL ────────────────────────────────────────
+function showNoteModal(idx) {
+  const item = cart[idx]; if (!item) return;
+  noteEditIdx = idx;
+  document.getElementById('note-item-name').textContent = item.nombre;
+  document.getElementById('note-input').value = item.nota || '';
+  document.getElementById('note-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('note-input').focus(), 150);
+}
+
+document.getElementById('note-save').addEventListener('click', () => {
+  if (noteEditIdx === null) return;
+  const nota = document.getElementById('note-input').value.trim();
+  if (cart[noteEditIdx]) { cart[noteEditIdx].nota = nota || null; cartSave(); }
+  document.getElementById('note-overlay').classList.remove('show');
+  renderResumen();
+});
+
+document.getElementById('note-clear').addEventListener('click', () => {
+  if (noteEditIdx !== null && cart[noteEditIdx]) { cart[noteEditIdx].nota = null; cartSave(); }
+  document.getElementById('note-overlay').classList.remove('show');
+  renderResumen();
+});
+
+document.getElementById('note-overlay').addEventListener('click', e => {
+  if (!e.target.closest('.note-sheet'))
+    document.getElementById('note-overlay').classList.remove('show');
 });
 
 // ── UI HELPERS ────────────────────────────────────────
@@ -794,7 +887,11 @@ function renderResumen() {
         const showP = item.precio && item.precio !== '$0';
         h += `<div class="r-item">
           <div class="r-qty">×${item.qty}</div>
-          <div class="r-nombre">${esc(item.nombre)}</div>
+          <div class="r-info">
+            <div class="r-nombre">${esc(item.nombre)}</div>
+            ${item.nota ? `<div class="r-nota">📝 ${esc(item.nota)}</div>` : ''}
+            <button class="r-nota-link" data-notaidx="${idx}">${item.nota ? '✎ editar nota' : '+ nota'}</button>
+          </div>
           ${showP ? `<div class="r-precio">${esc(item.precio)}</div>` : ''}
           <button class="r-rm" data-ridx="${idx}">✕</button>
         </div>`;
@@ -810,7 +907,10 @@ function renderResumen() {
         const showP = item.precio && item.precio !== '$0';
         h += `<div class="r-item r-sent">
           <div class="r-qty">×${item.qty}</div>
-          <div class="r-nombre">${esc(item.nombre)}</div>
+          <div class="r-info">
+            <div class="r-nombre">${esc(item.nombre)}</div>
+            ${item.nota ? `<div class="r-nota">📝 ${esc(item.nota)}</div>` : ''}
+          </div>
           ${showP ? `<div class="r-precio">${esc(item.precio)}</div>` : ''}
         </div>`;
       });
@@ -838,6 +938,8 @@ function renderResumen() {
 }
 
 document.getElementById('resumen-scroll').addEventListener('click', e => {
+  const nota = e.target.closest('[data-notaidx]');
+  if (nota) { showNoteModal(+nota.dataset.notaidx); return; }
   const rm = e.target.closest('[data-ridx]');
   if (!rm) return;
   const idx = +rm.dataset.ridx;
@@ -872,7 +974,8 @@ function buildMsg() {
       if (sec && secKeys.length > 1) msg += `_${sec}_\n`;
       secs[sec].forEach(item => {
         const p = (item.precio && item.precio !== '$0') ? ` — ${item.precio}` : '';
-        msg += `• ${item.qty}× ${item.nombre}${p}\n`;
+        const n = item.nota ? ` _(${item.nota})_` : '';
+        msg += `• ${item.qty}× ${item.nombre}${p}${n}\n`;
       });
     });
   });

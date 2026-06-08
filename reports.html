@@ -333,6 +333,8 @@ function renderReport() {
     return s + (pago ? Number(pago.monto) : 0);
   }, 0);
   const ticketPromedio = closedSessions.length > 0 ? Math.round(totalVentas / closedSessions.length) : 0;
+  const totalCubiertos = closedSessions.reduce((s, sess) => s + (sess.cubiertos || 1), 0);
+  const ticketPorPersona = totalCubiertos > 0 ? Math.round(totalVentas / totalCubiertos) : 0;
 
   // Por método de pago
   const byMetodo = {};
@@ -372,8 +374,8 @@ function renderReport() {
       <div class="stat-lbl">Mesas cerradas</div>
     </div>
     <div class="stat-card">
-      <div class="stat-val">${ticketPromedio > 0 ? '$'+Math.round(ticketPromedio/1000)+'k' : '—'}</div>
-      <div class="stat-lbl">Ticket promedio</div>
+      <div class="stat-val">${ticketPorPersona > 0 ? '$'+Math.round(ticketPorPersona/1000)+'k' : '—'}</div>
+      <div class="stat-lbl">Por persona</div>
     </div>
   </div>`;
 
@@ -439,7 +441,7 @@ function renderReport() {
         </div>
         <div class="session-row2">
           <span class="session-metodo">${metodInfo ? metodInfo.icon+' '+metodInfo.label : 'Sin pago registrado'}</span>
-          <span class="session-items-n">${itemsN} item${itemsN!==1?'s':''}</span>
+          <span class="session-items-n">${itemsN} item${itemsN!==1?'s':''} · ${sess.cubiertos||1} cub.</span>
           ${pago?.monto > 0 ? `<div class="session-total">$${Number(pago.monto).toLocaleString('es-AR')}</div>` : ''}
         </div>
       </div>`;
