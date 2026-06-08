@@ -95,6 +95,7 @@
     }
     .mesa-lbl{font-size:.58rem;color:var(--gray);letter-spacing:.12em;text-transform:uppercase;}
     .mesa-session-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);opacity:.8;}
+    .mesa-moza{font-size:.48rem;color:var(--gray);letter-spacing:.06em;margin-top:1px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .llevar-lbl{font-size:.95rem;font-weight:700;color:var(--gold);letter-spacing:.04em;}
 
     /* ── SCREEN: MENU ── */
@@ -538,7 +539,7 @@ function hasRealPrices() {
 async function loadOpenSessions() {
   try {
     const { data } = await sb.from('sesiones')
-      .select('mesa,id,created_at,tipo,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
+      .select('mesa,id,created_at,tipo,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
       .eq('estado','abierta');
     openSessions = {};
     deliverySessions = [];
@@ -822,18 +823,22 @@ async function renderMesas() {
   let h = '';
   for (let i = 1; i <= numMesas; i++) {
     const key = `mesa_${i}`;
-    const active = !!openSessions[key];
+    const sess = openSessions[key];
+    const active = !!sess;
+    const mozaNombre = sess?.moza_nombre ? `<div class="mesa-moza">${esc(sess.moza_nombre)}</div>` : '';
     h += `<div class="mesa-btn${active?' has-session':''}" data-mesa="${key}">
       <div class="mesa-num">${i}</div>
       <div class="mesa-lbl">Mesa</div>
-      ${active ? `<div class="mesa-session-dot"></div>` : ''}
+      ${active ? `<div class="mesa-session-dot"></div>${mozaNombre}` : ''}
     </div>`;
   }
-  const llevarActive = !!openSessions['llevar'];
+  const llevarSess = openSessions['llevar'];
+  const llevarActive = !!llevarSess;
+  const llevarMoza = llevarSess?.moza_nombre ? `<div class="mesa-moza">${esc(llevarSess.moza_nombre)}</div>` : '';
   h += `<div class="mesa-btn llevar${llevarActive?' has-session':''}" data-mesa="llevar">
     <span style="font-size:1.2rem">🛍️</span>
     <div class="llevar-lbl">Para llevar</div>
-    ${llevarActive ? `<div class="mesa-session-dot"></div>` : ''}
+    ${llevarActive ? `<div class="mesa-session-dot"></div>${llevarMoza}` : ''}
   </div>`;
   document.getElementById('mesa-grid').innerHTML = h;
 
