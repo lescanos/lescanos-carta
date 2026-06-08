@@ -258,9 +258,19 @@ async function keepScreenOn() {
   } catch(e) {}
 }
 
+// ── CIERRE TRACKING ───────────────────────────────────
+// After a daily cierre, listos before that time are hidden
+let listoDesde = new Date().toISOString().split('T')[0] + 'T00:00:00';
+
+async function checkTodayCierre() {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('cierres').select('created_at').eq('fecha', today)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (data?.created_at) listoDesde = data.created_at;
+}
+
 // ── LOAD ORDERS ───────────────────────────────────────
 async function loadOrders() {
-  const today = new Date().toISOString().split('T')[0];
   try {
     const [{ data: pending }, { data: done }] = await Promise.all([
       sb.from('pedidos')
@@ -270,7 +280,7 @@ async function loadOrders() {
       sb.from('pedidos')
         .select('*, sesiones(mesa), pedido_items(*)')
         .eq('estado', 'listo')
-        .gte('listo_at', `${today}T00:00:00`)
+        .gte('listo_at', listoDesde)
         .order('listo_at', { ascending: false })
         .limit(15),
     ]);
@@ -386,6 +396,17 @@ function setupRealtime() {
   const dot   = document.getElementById('rt-dot');
   const label = document.getElementById('rt-label');
 
+  // Cuando llega un cierre de caja, limpiar historial de listos
+  sb.channel('kitchen-cierre')
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'cierres'
+    }, payload => {
+      if (payload.new?.created_at) listoDesde = payload.new.created_at;
+      orders = orders.filter(o => o.estado === 'pendiente');
+      renderOrders();
+    })
+    .subscribe();
+
   sb.channel('kitchen-orders')
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'pedidos'
@@ -452,6 +473,7 @@ async function doLogout() {
     window.location.href = './login.html?error=acceso'; return;
   }
   keepScreenOn();
+  await checkTodayCierre();
   loadOrders();
   setupRealtime();
 })();

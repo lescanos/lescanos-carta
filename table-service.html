@@ -322,6 +322,17 @@
       font-size:.8rem;cursor:pointer;letter-spacing:.04em;display:block;}
     .del-cancel:active{background:rgba(255,255,255,.04);}
 
+    /* ── MESA CONFIRM MODAL ── */
+    .mesa-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:90;display:none;align-items:center;justify-content:center;padding:24px;}
+    .mesa-confirm-overlay.show{display:flex;}
+    .mesa-confirm-box{background:#1C1C1C;border:1px solid rgba(201,168,76,.3);border-radius:18px;padding:26px 22px;width:100%;max-width:300px;text-align:center;}
+    .mesa-confirm-title{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;color:var(--gold);margin-bottom:6px;}
+    .mesa-confirm-sub{font-size:.75rem;color:var(--gray);margin-bottom:22px;letter-spacing:.03em;}
+    .mesa-confirm-btns{display:flex;gap:8px;}
+    .mesa-confirm-ok{flex:1;padding:13px;background:rgba(201,168,76,.15);color:var(--gold);border:1.5px solid rgba(201,168,76,.45);border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer;letter-spacing:.04em;}
+    .mesa-confirm-ok:active{background:rgba(201,168,76,.25);}
+    .mesa-confirm-cancel{padding:13px 16px;background:transparent;color:var(--gray);border:1px solid var(--border);border-radius:10px;font-size:.85rem;cursor:pointer;}
+
     /* ── DELIVERY SECTION EN MESAS ── */
     .delivery-heading{padding:14px 16px 6px;font-size:.65rem;color:var(--gray);
       letter-spacing:.18em;text-transform:uppercase;flex-shrink:0;display:flex;align-items:center;gap:6px;}
@@ -465,6 +476,18 @@
   </div>
 </div>
 
+<!-- ── MESA CONFIRM MODAL ── -->
+<div class="mesa-confirm-overlay" id="mesa-confirm-overlay">
+  <div class="mesa-confirm-box">
+    <div class="mesa-confirm-title" id="mesa-confirm-title">Mesa 1</div>
+    <div class="mesa-confirm-sub">¿Querés abrir esta mesa?</div>
+    <div class="mesa-confirm-btns">
+      <button class="mesa-confirm-cancel" id="mesa-confirm-cancel">Cancelar</button>
+      <button class="mesa-confirm-ok" id="mesa-confirm-ok">Abrir mesa</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── NOTE MODAL ── -->
 <div class="note-overlay" id="note-overlay">
   <div class="note-sheet">
@@ -507,6 +530,7 @@ let sessionItems     = [];    // items ya enviados en esta sesión
 let openSessions     = {};    // { 'mesa_1': session, ... }
 let deliverySessions = [];    // envíos activos [{ id, mesa, cliente_nombre, ... }]
 let noteEditIdx      = null;  // índice en cart del item con nota abierta
+let pendingMesaKey   = null;  // mesa esperando confirmación de apertura
 let selectedCubiertos = 1;   // cubiertos para el cierre de mesa
 let hdrCubiertos     = 1;    // cubiertos visibles en el header del menú
 let listoChannel     = null; // canal Realtime para notif "pedido listo"
@@ -874,21 +898,53 @@ async function renderMesas() {
   });
 }
 
-document.getElementById('mesa-grid').addEventListener('click', async e => {
-  const btn = e.target.closest('[data-mesa]');
-  if (!btn) return;
-  mesa = btn.dataset.mesa;
+function mesaKeyLabel(key) {
+  if (!key) return '';
+  if (key === 'llevar') return 'Para llevar';
+  if (key.startsWith('envio_')) return 'Envío';
+  return `Mesa ${key.replace('mesa_', '')}`;
+}
+
+async function enterMesa(mesaKey) {
+  mesa = mesaKey;
   cartLoad();
   pageIdx = 0;
   document.getElementById('hdr-mesa').textContent = mesaLabel();
   document.getElementById('hdr-resumen-mesa').textContent = mesaLabel();
-
-  // Mostrar menú de inmediato y cargar sesión en background
   showScreen('menu');
   renderMenu();
-
   await openOrLoadSession(mesa);
   updateCartUI();
+}
+
+document.getElementById('mesa-grid').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-mesa]');
+  if (!btn) return;
+  const mesaKey = btn.dataset.mesa;
+
+  if (openSessions[mesaKey]) {
+    // Mesa ya abierta: entrar directamente
+    await enterMesa(mesaKey);
+  } else {
+    // Mesa cerrada: pedir confirmación antes de crear sesión
+    pendingMesaKey = mesaKey;
+    document.getElementById('mesa-confirm-title').textContent = mesaKeyLabel(mesaKey);
+    document.getElementById('mesa-confirm-overlay').classList.add('show');
+  }
+});
+
+document.getElementById('mesa-confirm-ok').addEventListener('click', async () => {
+  document.getElementById('mesa-confirm-overlay').classList.remove('show');
+  if (pendingMesaKey) {
+    const key = pendingMesaKey;
+    pendingMesaKey = null;
+    await enterMesa(key);
+  }
+});
+
+document.getElementById('mesa-confirm-cancel').addEventListener('click', () => {
+  document.getElementById('mesa-confirm-overlay').classList.remove('show');
+  pendingMesaKey = null;
 });
 
 // ── SCREEN: MENU ──────────────────────────────────────
