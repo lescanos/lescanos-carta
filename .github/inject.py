@@ -15,7 +15,7 @@ replacements = {
         ('__ADMIN_PWD__', secrets['ADMIN_PWD']),
         ('__MENU_TOKEN__', secrets['MENU_TOKEN']),
     ],
-    'dist/litzy.html': [
+    'dist/table-service.html': [
         ('__WA_NUMBER__', secrets['WA_NUMBER']),
         ('__NUM_MESAS__', secrets['NUM_MESAS']),
     ],
