@@ -195,6 +195,10 @@
       letter-spacing:.04em;
     }
     .btn-cerrar:active{background:rgba(255,80,80,.08);}
+    .btn-volver-mesas{width:100%;padding:11px;background:transparent;color:var(--gold);
+      border:1.5px solid rgba(201,168,76,.4);border-radius:10px;font-weight:700;font-size:.82rem;
+      cursor:pointer;letter-spacing:.04em;margin-bottom:6px;}
+    .btn-volver-mesas:active{background:rgba(201,168,76,.08);}
     .fallback{margin-top:9px;display:none;}
     .fallback textarea{
       width:100%;height:72px;background:var(--dark2);
@@ -419,6 +423,7 @@
         <textarea id="fallback-txt" readonly></textarea>
         <button class="btn-copiar" id="btn-copiar">Copiar texto</button>
       </div>
+      <button class="btn-volver-mesas" id="btn-volver-mesas" style="display:none">← Volver a mesas</button>
       <button class="btn-cerrar" id="btn-cerrar">Cerrar mesa</button>
     </div>
   </div>
@@ -537,17 +542,24 @@ function hasRealPrices() {
 
 // ── SUPABASE OPS ──────────────────────────────────────
 async function loadOpenSessions() {
-  try {
-    const { data } = await sb.from('sesiones')
-      .select('mesa,id,created_at,tipo,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
+  openSessions = {}; deliverySessions = [];
+  // Intentar con columnas de delivery; si fallan (schema viejo), caer a columnas básicas
+  let data = null;
+  const full = await sb.from('sesiones')
+    .select('mesa,id,created_at,tipo,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia')
+    .eq('estado','abierta');
+  if (!full.error) {
+    data = full.data;
+  } else {
+    const basic = await sb.from('sesiones')
+      .select('mesa,id,created_at,moza_nombre')
       .eq('estado','abierta');
-    openSessions = {};
-    deliverySessions = [];
-    (data || []).forEach(s => {
-      if (s.tipo === 'envio') { deliverySessions.push(s); }
-      else { openSessions[s.mesa] = s; }
-    });
-  } catch(e) { openSessions = {}; deliverySessions = []; }
+    data = basic.data;
+  }
+  (data || []).forEach(s => {
+    if (s.tipo === 'envio') { deliverySessions.push(s); }
+    else { openSessions[s.mesa] = s; }
+  });
 }
 
 async function openOrLoadSession(mesaId) {
@@ -822,24 +834,24 @@ async function renderMesas() {
   await loadOpenSessions();
   let h = '';
   for (let i = 1; i <= numMesas; i++) {
-    const key = `mesa_${i}`;
+    const key = 'mesa_' + i;
     const sess = openSessions[key];
     const active = !!sess;
-    const mozaNombre = sess?.moza_nombre ? `<div class="mesa-moza">${esc(sess.moza_nombre)}</div>` : '';
-    h += `<div class="mesa-btn${active?' has-session':''}" data-mesa="${key}">
-      <div class="mesa-num">${i}</div>
-      <div class="mesa-lbl">Mesa</div>
-      ${active ? `<div class="mesa-session-dot"></div>${mozaNombre}` : ''}
-    </div>`;
+    let inner = '<div class="mesa-num">' + i + '</div><div class="mesa-lbl">Mesa</div>';
+    if (active) {
+      inner += '<div class="mesa-session-dot"></div>';
+      if (sess.moza_nombre) inner += '<div class="mesa-moza">' + esc(sess.moza_nombre) + '</div>';
+    }
+    h += '<div class="mesa-btn' + (active ? ' has-session' : '') + '" data-mesa="' + key + '">' + inner + '</div>';
   }
   const llevarSess = openSessions['llevar'];
   const llevarActive = !!llevarSess;
-  const llevarMoza = llevarSess?.moza_nombre ? `<div class="mesa-moza">${esc(llevarSess.moza_nombre)}</div>` : '';
-  h += `<div class="mesa-btn llevar${llevarActive?' has-session':''}" data-mesa="llevar">
-    <span style="font-size:1.2rem">🛍️</span>
-    <div class="llevar-lbl">Para llevar</div>
-    ${llevarActive ? `<div class="mesa-session-dot"></div>${llevarMoza}` : ''}
-  </div>`;
+  let llevarInner = '<span style="font-size:1.2rem">🛍️</span><div class="llevar-lbl">Para llevar</div>';
+  if (llevarActive) {
+    llevarInner += '<div class="mesa-session-dot"></div>';
+    if (llevarSess.moza_nombre) llevarInner += '<div class="mesa-moza">' + esc(llevarSess.moza_nombre) + '</div>';
+  }
+  h += '<div class="mesa-btn llevar' + (llevarActive ? ' has-session' : '') + '" data-mesa="llevar">' + llevarInner + '</div>';
   document.getElementById('mesa-grid').innerHTML = h;
 
   // Sección de envíos activos + botón nuevo
@@ -1274,10 +1286,21 @@ document.getElementById('btn-enviar').addEventListener('click', async () => {
   cartClear();
 
   toast(saved ? '¡Pedido enviado y guardado! ✓' : '¡Pedido enviado! (sin conexión)');
+  document.getElementById('btn-volver-mesas').style.display = 'block';
 
   // Re-render resumen con historial actualizado
   renderResumen();
   updateCartUI();
+});
+
+document.getElementById('btn-volver-mesas').addEventListener('click', async () => {
+  if (listoChannel) { await sb.removeChannel(listoChannel); listoChannel = null; }
+  document.getElementById('listo-banner').classList.remove('show');
+  document.getElementById('btn-wa-cadete').style.display = 'none';
+  document.getElementById('btn-volver-mesas').style.display = 'none';
+  mesa = null; cart = []; currentSession = null; sessionItems = [];
+  await renderMesas();
+  showScreen('mesas');
 });
 
 document.getElementById('btn-copiar').addEventListener('click', async () => {
@@ -1314,6 +1337,7 @@ document.getElementById('back-mesas').addEventListener('click', async () => {
   showScreen('mesas');
 });
 document.getElementById('back-menu').addEventListener('click', () => {
+  document.getElementById('btn-volver-mesas').style.display = 'none';
   renderMenu(); showScreen('menu');
 });
 document.getElementById('btn-ver').addEventListener('click', () => {

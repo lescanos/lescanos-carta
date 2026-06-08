@@ -564,6 +564,16 @@ document.getElementById('cierre-confirm').addEventListener('click', async () => 
       pedidosya:      pendingCierreData.pedidosya,
       notas:          notas || null,
     });
+
+    // Cerrar todas las mesas abiertas y limpiar pantalla de cocina
+    const now = new Date().toISOString();
+    await sb.from('sesiones')
+      .update({ estado: 'cerrada', closed_at: now })
+      .eq('estado', 'abierta');
+    await sb.from('pedidos')
+      .update({ estado: 'listo', listo_at: now })
+      .eq('estado', 'pendiente');
+
     loadReport();
   } catch(e) {
     console.error('Error guardando cierre:', e);
