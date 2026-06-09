@@ -30,6 +30,7 @@
     .hdr-sep{color:var(--gray);font-size:.9rem;}
     .hdr-title{font-size:.8rem;font-weight:700;color:#bbb;letter-spacing:.14em;text-transform:uppercase;}
     .hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+    .kitchen-clock{font-size:.82rem;font-weight:700;color:var(--gold);letter-spacing:.06em;font-family:'Lato',sans-serif;}
     .pending-badge{
       background:var(--gold);color:#000;font-size:.75rem;font-weight:900;
       padding:4px 12px;border-radius:20px;letter-spacing:.04em;min-width:28px;text-align:center;
@@ -97,6 +98,18 @@
       60% {box-shadow:0 0 0 6px rgba(201,168,76,.15);}
       100%{box-shadow:none;}
     }
+
+    /* ── CANCELACION CARD ── */
+    .order-card.cancelacion{border-color:rgba(229,57,53,.7);background:rgba(229,57,53,.04);}
+    .order-card.cancelacion.new-order{animation:cancelFlash 2.5s ease-out forwards;}
+    @keyframes cancelFlash{
+      0%  {box-shadow:0 0 0 8px rgba(229,57,53,.55);}
+      60% {box-shadow:0 0 0 6px rgba(229,57,53,.15);}
+      100%{box-shadow:none;}
+    }
+    .order-card.cancelacion .card-head{background:rgba(229,57,53,.1);border-bottom-color:rgba(229,57,53,.25);}
+    .card-cancelacion-badge{font-size:.62rem;font-weight:900;color:#e53935;letter-spacing:.12em;
+      background:rgba(229,57,53,.15);padding:3px 9px;border-radius:6px;white-space:nowrap;}
 
     /* ── CAMBIO CARD ── */
     .order-card.cambio{border-color:rgba(232,149,0,.7);background:rgba(232,149,0,.04);}
@@ -176,6 +189,7 @@
   <div class="hdr-sep">·</div>
   <div class="hdr-title">Cocina</div>
   <div class="hdr-right">
+    <span class="kitchen-clock" id="kitchen-clock">--:--:--</span>
     <span class="pending-badge zero" id="pending-badge">0</span>
     <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
     <a class="back-link" href="./index.html">← Panel</a>
@@ -365,7 +379,8 @@ function renderCard(order) {
   const mesa     = order.sesiones?.mesa;
   const items    = order.pedido_items || [];
   const late     = isLate(order.created_at);
-  const isCambio = order.tipo === 'cambio';
+  const isCambio      = order.tipo === 'cambio';
+  const isCancelacion = order.tipo === 'cancelacion';
 
   const itemsHtml = items.map(item => `
     <div class="item-row">
@@ -376,10 +391,15 @@ function renderCard(order) {
       </div>
     </div>`).join('');
 
-  return `<div class="order-card${isCambio ? ' cambio' : ''}" id="order-${order.id}">
+  const cardClass = isCambio ? ' cambio' : isCancelacion ? ' cancelacion' : '';
+  const badge = isCambio      ? `<span class="card-cambio-badge">⚠️ CAMBIO</span>`
+              : isCancelacion ? `<span class="card-cancelacion-badge">🚫 CANCELAR</span>`
+              : '';
+
+  return `<div class="order-card${cardClass}" id="order-${order.id}">
     <div class="card-head">
       <div class="card-mesa">${mesaLabel(mesa)}</div>
-      ${isCambio ? `<span class="card-cambio-badge">⚠️ CAMBIO</span>` : ''}
+      ${badge}
       <div class="card-time${late?' late':''}" data-ts="${order.created_at}">${timeAgo(order.created_at)}</div>
     </div>
     <div class="card-items">${itemsHtml}</div>
@@ -458,11 +478,14 @@ function setupRealtime() {
       if (data) {
         orders.unshift(data);
         renderOrders();
-        const isCambio = data.tipo === 'cambio';
+        const tipo = data.tipo;
         const mesa = data.sesiones?.mesa;
-        if (isCambio) {
+        if (tipo === 'cambio') {
           playBeepCambio();
           showFlash(`⚠️ CAMBIO — ${mesaLabel(mesa)}`);
+        } else if (tipo === 'cancelacion') {
+          playBeepCambio();
+          showFlash(`🚫 CANCELAR — ${mesaLabel(mesa)}`);
         } else {
           playBeep();
           showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(mesa)}`);
@@ -500,6 +523,17 @@ setInterval(() => {
 
 // ── REFRESH ───────────────────────────────────────────
 document.getElementById('btn-refresh').addEventListener('click', loadOrders);
+
+// ── RELOJ EN TIEMPO REAL ──────────────────────────────
+function updateClock() {
+  const t = new Date().toLocaleTimeString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  document.getElementById('kitchen-clock').textContent = t;
+}
+setInterval(updateClock, 1000);
+updateClock();
 
 // ── INIT ──────────────────────────────────────────────
 async function doLogout() {

@@ -250,11 +250,16 @@
     .pay-cub-btn:active{background:rgba(201,168,76,.15);}
     .pay-cub-num{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;color:var(--gold);min-width:28px;text-align:center;}
 
-    /* ── CAMBIO BUTTON (en items ya enviados) ── */
+    /* ── BOTONES EN ITEMS YA ENVIADOS ── */
+    .r-sent-actions{display:flex;gap:5px;flex-shrink:0;}
     .r-cambio-btn{background:transparent;border:1px solid rgba(230,150,0,.5);color:#E89500;
       font-size:.62rem;padding:3px 9px;border-radius:6px;cursor:pointer;
-      letter-spacing:.03em;white-space:nowrap;flex-shrink:0;}
+      letter-spacing:.03em;white-space:nowrap;}
     .r-cambio-btn:active{background:rgba(230,150,0,.12);}
+    .r-cancel-btn{background:transparent;border:1px solid rgba(229,57,53,.4);color:#e57373;
+      font-size:.62rem;padding:3px 9px;border-radius:6px;cursor:pointer;
+      letter-spacing:.03em;white-space:nowrap;}
+    .r-cancel-btn:active{background:rgba(229,57,53,.1);}
 
     /* ── CAMBIO MODAL ── */
     .cambio-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:75;display:none;align-items:flex-end;}
@@ -803,6 +808,29 @@ document.getElementById('cambio-overlay').addEventListener('click', e => {
   }
 });
 
+async function confirmarCancelacion(item) {
+  if (!confirm('¿Cancelar "' + item.nombre + '"? Se avisará a la cocina.')) return;
+  if (!currentSession) return;
+  try {
+    const { data: pedido, error: pErr } = await sb.from('pedidos')
+      .insert({ sesion_id: currentSession.id, tipo: 'cancelacion' }).select().single();
+    if (pErr) throw pErr;
+    await sb.from('pedido_items').insert({
+      pedido_id: pedido.id,
+      sesion_id: currentSession.id,
+      nombre:    item.nombre,
+      nota:      item.nota || null,
+      qty:       item.qty,
+      precio:    '$0',
+      seccion:   'CANCELACION',
+    });
+    toast('Cancelación enviada a cocina ✓');
+  } catch(e) {
+    console.error('Error enviando cancelación:', e);
+    toast('Error al enviar la cancelación');
+  }
+}
+
 async function saveOrderToSupabase() {
   if (!currentSession || cart.length === 0) return false;
   try {
@@ -1295,7 +1323,10 @@ function renderResumen() {
             (item.nota ? '<div class="r-nota">📝 ' + esc(item.nota) + '</div>' : '') +
           '</div>' +
           (showP ? '<div class="r-precio">' + esc(item.precio) + '</div>' : '') +
-          '<button class="r-cambio-btn" data-cambio-idx="' + idx + '">⚠ Cambiar</button>' +
+          '<div class="r-sent-actions">' +
+            '<button class="r-cambio-btn" data-cambio-idx="' + idx + '">⚠ Cambiar</button>' +
+            '<button class="r-cancel-btn" data-cancelar-idx="' + idx + '">✕ Cancelar</button>' +
+          '</div>' +
         '</div>';
       });
     }
@@ -1327,6 +1358,9 @@ document.getElementById('resumen-scroll').addEventListener('click', e => {
 
   const cambioBtn = e.target.closest('[data-cambio-idx]');
   if (cambioBtn) { showCambioModal(sessionItems[+cambioBtn.dataset.cambioIdx]); return; }
+
+  const cancelBtn = e.target.closest('[data-cancelar-idx]');
+  if (cancelBtn) { confirmarCancelacion(sessionItems[+cancelBtn.dataset.cancelarIdx]); return; }
 
   const rm = e.target.closest('[data-ridx]');
   if (!rm) return;
@@ -1561,6 +1595,17 @@ async function doLogout() {
   document.getElementById('hdr-user').textContent = currentUser.nombre;
   await loadConfig();
   setupGlobalListoNotifs();
+
+  // Actualizar grilla cuando cualquier sesión se abre o cierra en tiempo real
+  sb.channel('sesiones-grid')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sesiones' }, () => {
+      if (document.getElementById('screen-mesas').classList.contains('active')) renderMesas();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sesiones' }, () => {
+      if (document.getElementById('screen-mesas').classList.contains('active')) renderMesas();
+    })
+    .subscribe();
+
   renderMesas();
   showScreen('mesas');
 })();
