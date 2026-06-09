@@ -98,6 +98,18 @@
       100%{box-shadow:none;}
     }
 
+    /* ── CAMBIO CARD ── */
+    .order-card.cambio{border-color:rgba(232,149,0,.7);background:rgba(232,149,0,.04);}
+    .order-card.cambio.new-order{animation:cambioFlash 2.5s ease-out forwards;}
+    @keyframes cambioFlash{
+      0%  {box-shadow:0 0 0 8px rgba(232,149,0,.55);}
+      60% {box-shadow:0 0 0 6px rgba(232,149,0,.15);}
+      100%{box-shadow:none;}
+    }
+    .order-card.cambio .card-head{background:rgba(232,149,0,.1);border-bottom-color:rgba(232,149,0,.25);}
+    .card-cambio-badge{font-size:.62rem;font-weight:900;color:#E89500;letter-spacing:.12em;
+      background:rgba(232,149,0,.15);padding:3px 9px;border-radius:6px;white-space:nowrap;}
+
     .card-head{
       background:rgba(201,168,76,.08);border-bottom:1px solid var(--border);
       padding:12px 14px;display:flex;align-items:baseline;gap:8px;
@@ -241,6 +253,23 @@ function playBeep() {
   } catch(e) {}
 }
 
+// 3 tonos descendentes — sonido distinto al beep de pedido nuevo
+function playBeepCambio() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [1000, 800, 600].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.2;
+      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t); osc.stop(t + 0.22);
+    });
+  } catch(e) {}
+}
+
 // ── FLASH NOTIFICATION ────────────────────────────────
 let flashTimer = null;
 function showFlash(msg) {
@@ -333,9 +362,10 @@ function renderOrders() {
 }
 
 function renderCard(order) {
-  const mesa  = order.sesiones?.mesa;
-  const items = order.pedido_items || [];
-  const late  = isLate(order.created_at);
+  const mesa     = order.sesiones?.mesa;
+  const items    = order.pedido_items || [];
+  const late     = isLate(order.created_at);
+  const isCambio = order.tipo === 'cambio';
 
   const itemsHtml = items.map(item => `
     <div class="item-row">
@@ -346,13 +376,14 @@ function renderCard(order) {
       </div>
     </div>`).join('');
 
-  return `<div class="order-card" id="order-${order.id}">
+  return `<div class="order-card${isCambio ? ' cambio' : ''}" id="order-${order.id}">
     <div class="card-head">
       <div class="card-mesa">${mesaLabel(mesa)}</div>
+      ${isCambio ? `<span class="card-cambio-badge">⚠️ CAMBIO</span>` : ''}
       <div class="card-time${late?' late':''}" data-ts="${order.created_at}">${timeAgo(order.created_at)}</div>
     </div>
     <div class="card-items">${itemsHtml}</div>
-    <button class="btn-listo" data-id="${order.id}">✓  Pedido listo</button>
+    <button class="btn-listo" data-id="${order.id}">✓  Listo</button>
   </div>`;
 }
 
@@ -427,11 +458,15 @@ function setupRealtime() {
       if (data) {
         orders.unshift(data);
         renderOrders();
-        playBeep();
+        const isCambio = data.tipo === 'cambio';
         const mesa = data.sesiones?.mesa;
-        showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(mesa)}`);
-
-        // Flash the card
+        if (isCambio) {
+          playBeepCambio();
+          showFlash(`⚠️ CAMBIO — ${mesaLabel(mesa)}`);
+        } else {
+          playBeep();
+          showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(mesa)}`);
+        }
         setTimeout(() => {
           const card = document.getElementById(`order-${data.id}`);
           if (card) card.classList.add('new-order');
