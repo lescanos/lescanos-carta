@@ -230,8 +230,16 @@ const METODOS_INFO = {
 };
 
 // ── DATE HELPERS ──────────────────────────────────────
-function toDateStr(d) {
-  return d.toISOString().split('T')[0];
+// BsAs siempre UTC-3, sin DST
+function todayBsAs() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+// Medianoche BsAs = 03:00:00 UTC
+function dayStartUTC(dateStr) { return dateStr + 'T03:00:00.000Z'; }
+function dayEndUTC(dateStr) {
+  // Fin del día BsAs = próximo día 02:59:59.999 UTC
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m-1, d+1, 2, 59, 59, 999)).toISOString();
 }
 function parseDate(s) {
   const [y,m,d] = s.split('-').map(Number);
@@ -241,10 +249,10 @@ function formatDate(s) {
   const d = parseDate(s);
   return d.toLocaleDateString('es-AR', {weekday:'long',day:'numeric',month:'long'});
 }
-function isToday(s) { return s === toDateStr(new Date()); }
+function isToday(s) { return s === todayBsAs(); }
 
 // ── STATE ─────────────────────────────────────────────
-let currentDate = toDateStr(new Date());
+let currentDate = todayBsAs();
 let reportData  = null;
 
 // ── DATE CONTROLS ─────────────────────────────────────
@@ -259,15 +267,15 @@ dateInput.addEventListener('change', () => {
 document.getElementById('btn-prev').addEventListener('click', () => {
   const d = parseDate(currentDate);
   d.setDate(d.getDate() - 1);
-  currentDate = toDateStr(d);
+  currentDate = [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
   dateInput.value = currentDate;
   loadReport();
 });
 document.getElementById('btn-next').addEventListener('click', () => {
   const d = parseDate(currentDate);
   d.setDate(d.getDate() + 1);
-  const next = toDateStr(d);
-  if (next > toDateStr(new Date())) return;
+  const next = [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+  if (next > todayBsAs()) return;
   currentDate = next;
   dateInput.value = currentDate;
   loadReport();
@@ -278,8 +286,8 @@ document.getElementById('btn-refresh').addEventListener('click', loadReport);
 async function loadReport() {
   document.getElementById('content').innerHTML = '<div class="loading">Cargando...</div>';
 
-  const dayStart = `${currentDate}T00:00:00`;
-  const dayEnd   = `${currentDate}T23:59:59`;
+  const dayStart = dayStartUTC(currentDate);
+  const dayEnd   = dayEndUTC(currentDate);
 
   try {
     // Sesiones abiertas o creadas en el día

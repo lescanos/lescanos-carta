@@ -512,6 +512,17 @@ const SB_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 // ── SUPABASE CLIENT ─────────────────────────────────
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
+// ── TIMEZONE (America/Argentina/Buenos_Aires = UTC-3, sin DST) ──────────────
+function bsAsTime() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(now);
+  const get = t => (parts.find(p => p.type === t)?.value || '00').padStart(2, '0');
+  return { hh: get('hour'), mm: get('minute') };
+}
+
 // ── MENU DATA ────────────────────────────────────────
 function getMenu() {
   try {
@@ -946,9 +957,16 @@ document.getElementById('mesa-grid').addEventListener('click', async e => {
   const btn = e.target.closest('[data-mesa]');
   if (!btn) return;
   const mesaKey = btn.dataset.mesa;
+  const sess = openSessions[mesaKey];
 
-  if (openSessions[mesaKey]) {
-    // Mesa ya abierta: entrar directamente
+  if (sess) {
+    const isMine = sess.moza_id === currentUser?.id;
+    const canAll = currentUser?.rol === 'caja' || currentUser?.rol === 'dueno';
+    if (!isMine && !canAll) {
+      // Mesa de otra moza — bloquear con aviso
+      toast('Mesa de ' + (sess.moza_nombre || 'otra moza') + ' — no podés entrar');
+      return;
+    }
     await enterMesa(mesaKey);
   } else {
     // Mesa cerrada: pedir confirmación antes de crear sesión
@@ -1285,9 +1303,7 @@ async function enterEnvio(mesaKey) {
 
 function buildDeliveryWAMsg() {
   const s = currentSession || {};
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2,'0');
-  const mm = String(now.getMinutes()).padStart(2,'0');
+  const { hh, mm } = bsAsTime();
   const allItems = [...sessionItems, ...cart];
   const lines = allItems.map(i => `${i.qty}× ${i.nombre}${i.nota ? ` _(${i.nota})_` : ''}`).join('\n');
   const total = grandTotal();
@@ -1308,9 +1324,7 @@ document.getElementById('btn-wa-cadete').addEventListener('click', () => {
 
 // ── SEND ──────────────────────────────────────────────
 function buildMsg() {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2,'0');
-  const mm = String(now.getMinutes()).padStart(2,'0');
+  const { hh, mm } = bsAsTime();
   let msg = `*${mesaLabel()} — ${hh}:${mm}*\n`;
 
   const byPage = {};

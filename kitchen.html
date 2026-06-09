@@ -258,12 +258,19 @@ async function keepScreenOn() {
   } catch(e) {}
 }
 
+// ── TIMEZONE (America/Argentina/Buenos_Aires = UTC-3, sin DST) ──────────────
+function todayBsAs() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+// Medianoche BsAs = 03:00:00 UTC (UTC-3)
+function dayStartUTC(dateStr) { return dateStr + 'T03:00:00.000Z'; }
+
 // ── CIERRE TRACKING ───────────────────────────────────
 // After a daily cierre, listos before that time are hidden
-let listoDesde = new Date().toISOString().split('T')[0] + 'T00:00:00';
+let listoDesde = dayStartUTC(todayBsAs());
 
 async function checkTodayCierre() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayBsAs();
   const { data } = await sb.from('cierres').select('created_at').eq('fecha', today)
     .order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (data?.created_at) listoDesde = data.created_at;
