@@ -1,6 +1,6 @@
 // Fuente de verdad del menú — compartido por index.html y litzy.html.
 // Para actualizar precios, usar la vista admin de index.html (guarda en localStorage).
-const DEFAULT_CARTA = [
+var DEFAULT_CARTA = [
   {
     pagina:"1", titulo:"Hamburguesas",
     secciones:[{
