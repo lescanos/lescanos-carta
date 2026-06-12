@@ -93,11 +93,36 @@ export interface Cierre {
 
 // ── CARRITO (estado local) ─────────────────────────────────────────────────
 export interface CartItem {
+  id: string          // clave local única (p0s1i2, p0s1i2-c0, promo-0-3, etc.)
   nombre: string
   precio: string
   qty: number
-  nota: string | null
+  nota?: string
+  pagina?: string
+  seccion?: string
+}
+
+// ── MENÚ (data de menu.js / localStorage) ─────────────────────────────────
+export interface MenuItem {
+  nombre: string
+  desc?: string
+  precio?: string
+  precios?: string[]
+}
+
+export interface MenuSeccion {
+  emoji?: string
+  titulo: string
+  nota?: string
+  columnas?: string[]
+  items: MenuItem[]
+}
+
+export interface MenuPagina {
   pagina: string
-  seccion: string
-  variante?: string
+  titulo: string
+  tipo?: 'promos'
+  subtitulo?: string
+  secciones?: MenuSeccion[]
+  items?: MenuItem[]
 }
