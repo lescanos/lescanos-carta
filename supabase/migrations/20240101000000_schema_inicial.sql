@@ -19,8 +19,9 @@ create table if not exists perfiles (
 
 alter table perfiles enable row level security;
 
+-- Lectura pública: la pantalla de login necesita los tiles sin estar autenticado
 create policy "perfiles_select" on perfiles
-  for select using (auth.role() = 'authenticated');
+  for select using (true);
 
 -- ── SESIONES ────────────────────────────────────────────────────────
 create table if not exists sesiones (
