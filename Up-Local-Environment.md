@@ -61,7 +61,25 @@ Cuando termina, muestra algo como:
 npx supabase db reset
 ```
 
-Esto crea todas las tablas, políticas RLS y carga los usuarios de prueba. Solo necesitás hacerlo **una vez** (o cuando quieras volver al estado inicial limpio).
+Esto crea todas las tablas y políticas RLS.
+
+Luego, crear los usuarios en el sistema de auth (GoTrue requiere su propia API para hashear contraseñas):
+
+```bash
+bash supabase/seed-auth.sh
+```
+
+Deberías ver:
+```
+Creando usuarios de prueba (contraseña: test1234)...
+✓ dueno@lescanos.local
+✓ moza1@lescanos.local
+✓ cocina@lescanos.local
+✓ caja@lescanos.local
+Listo.
+```
+
+> Estos dos pasos solo son necesarios la primera vez, o cuando querés volver al estado inicial limpio.
 
 ### 5. Crear el archivo de entorno local
 
