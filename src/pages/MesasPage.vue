@@ -461,8 +461,8 @@ onUnmounted(() => {
 })
 
 async function doLogout() {
-  await supabase.auth.signOut()
-  router.replace({ name: 'login' })
+  await auth.logout()
+  router.replace({ name: 'carta' })
 }
 </script>
 
