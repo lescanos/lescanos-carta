@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import type { Rol } from '@/types/domain'
 
 // Páginas — lazy loaded para mejor performance
+const CartaPage   = () => import('@/pages/CartaPage.vue')
 const LoginPage   = () => import('@/pages/LoginPage.vue')
 const MesasPage   = () => import('@/pages/MesasPage.vue')
 const KitchenPage = () => import('@/pages/KitchenPage.vue')
@@ -20,7 +21,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/login',
+      name: 'carta',
+      component: CartaPage,
     },
     {
       path: '/login',
@@ -47,7 +49,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/login',
+      redirect: '/',
     },
   ],
 })
