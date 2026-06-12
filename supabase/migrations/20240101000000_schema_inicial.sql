@@ -158,3 +158,18 @@ create policy "config_upsert" on config
 -- ── SEED CONFIG ─────────────────────────────────────────────────────
 insert into config (clave, valor) values ('num_mesas', '8')
   on conflict (clave) do nothing;
+
+-- ── GRANTS ──────────────────────────────────────────────────────────
+-- RLS sola no alcanza: el rol también necesita privilegios de tabla.
+-- perfiles: lectura pública (login screen la necesita sin auth)
+grant select on perfiles to anon;
+grant select on perfiles to authenticated;
+
+-- resto: solo authenticated
+grant select, insert, update on sesiones      to authenticated;
+grant select, insert, update on pedidos       to authenticated;
+grant select, insert         on pedido_items  to authenticated;
+grant select, insert         on pagos         to authenticated;
+grant select, insert, update on cierres       to authenticated;
+grant select, insert, update on config        to authenticated;
+grant select                 on config        to anon;
