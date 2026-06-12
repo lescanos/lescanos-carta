@@ -16,6 +16,10 @@ dist/
 *.local
 .vite/
 
+# Supabase local (no commitear estado de contenedores)
+supabase/.branches/
+supabase/.temp/
+
 # Editor
 .vscode/
 .idea/
