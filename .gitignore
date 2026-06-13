@@ -2,3 +2,32 @@
 .agents/
 .gstack/
 skills-lock.json
+
+# Node
+node_modules/
+dist/
+
+# Env — NUNCA commitear secrets
+.env
+.env.local
+.env.*.local
+
+# Vite
+*.local
+.vite/
+
+# Supabase local (no commitear estado de contenedores)
+supabase/.branches/
+supabase/.temp/
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
