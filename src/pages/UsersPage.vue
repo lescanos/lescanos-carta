@@ -176,14 +176,21 @@ async function loadMenu() {
     itemsBySec.get(item.seccion_id)!.push(item)
   }
 
-  menuSecciones.value = (secs as SeccionDisplay[]).map(s => ({
-    ...s,
-    items: (itemsBySec.get(s.id) ?? []).map(item => ({
-      id: item.id,
-      nombre: item.nombre,
-      descripcion: item.descripcion ?? '',
-      precios: [...item.precios],
-      columnas: s.columnas,
+  menuSecciones.value = secs.map(s => ({
+    id: s.id as string,
+    pagina: s.pagina as number,
+    pagina_titulo: s.pagina_titulo as string,
+    pagina_tipo: s.pagina_tipo as string,
+    emoji: s.emoji as string | null,
+    titulo: s.titulo as string,
+    nota: s.nota as string | null,
+    columnas: s.columnas as string[] | null,
+    items: (itemsBySec.get(s.id as string) ?? []).map(item => ({
+      id: item.id as string,
+      nombre: item.nombre as string,
+      descripcion: (item.descripcion ?? '') as string,
+      precios: [...(item.precios as string[])],
+      columnas: s.columnas as string[] | null,
       saving: false,
     })),
   }))
