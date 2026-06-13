@@ -103,7 +103,30 @@ export interface CartItem {
   seccion?: string
 }
 
-// ── MENÚ (data de menu.js / localStorage) ─────────────────────────────────
+// ── MENÚ (filas de la base de datos) ──────────────────────────────────────
+export interface MenuSeccionRow {
+  id: string
+  pagina: number
+  pagina_titulo: string
+  pagina_tipo: string
+  pagina_subtitulo: string | null
+  seccion_orden: number
+  emoji: string | null
+  titulo: string
+  nota: string | null
+  columnas: string[] | null
+}
+
+export interface MenuItemRow {
+  id: string
+  seccion_id: string
+  item_orden: number
+  nombre: string
+  descripcion: string | null
+  precios: string[]
+}
+
+// ── MENÚ (estructura para CartaPage / localStorage) ───────────────────────
 export interface MenuItem {
   nombre: string
   desc?: string

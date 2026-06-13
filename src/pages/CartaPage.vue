@@ -95,14 +95,16 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import logoFile from '@/assets/logo.png'
-import type { MenuPagina } from '@/types/domain'
+import { supabase } from '@/services/supabase'
+import { dbRowsToMenuPaginas } from '@/utils/menuMapper'
+import type { MenuPagina, MenuSeccionRow, MenuItemRow } from '@/types/domain'
 
 const router = useRouter()
 
 const logoSrc = logoFile
 
 // ── CARTA DATA ─────────────────────────────────────────────────────────────
-function getMenu(): MenuPagina[] {
+function getCachedMenu(): MenuPagina[] {
   try {
     const s = localStorage.getItem('lescanos_carta')
     if (s) return JSON.parse(s)
@@ -112,7 +114,20 @@ function getMenu(): MenuPagina[] {
   return []
 }
 
-const carta = ref<MenuPagina[]>(getMenu())
+const carta = ref<MenuPagina[]>(getCachedMenu())
+
+async function loadMenuFromDB() {
+  const [{ data: secciones }, { data: items }] = await Promise.all([
+    supabase.from('menu_secciones').select('*').order('pagina').order('seccion_orden'),
+    supabase.from('menu_items').select('*').order('seccion_id').order('item_orden'),
+  ])
+  if (!secciones || !items) return
+  const paginas = dbRowsToMenuPaginas(secciones as MenuSeccionRow[], items as MenuItemRow[])
+  if (paginas.length > 0) {
+    carta.value = paginas
+    localStorage.setItem('lescanos_carta', JSON.stringify(paginas))
+  }
+}
 
 // ── CAROUSEL ───────────────────────────────────────────────────────────────
 const carouselEl = ref<HTMLElement | null>(null)
@@ -139,6 +154,7 @@ function onKeyDown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', onKeyDown)
+  loadMenuFromDB()
 })
 
 onUnmounted(() => {
