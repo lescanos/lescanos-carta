@@ -43,7 +43,7 @@ function parsePrecio(p: string): number {
 }
 
 function mesaLabel(mesa: string): string {
-  if (mesa === 'llevar') return 'Para llevar'
+  if (mesa.startsWith('llevar')) return 'Para llevar'
   if (mesa.startsWith('envio_')) return 'Envío'
   return `Mesa ${mesa.replace('mesa_', '')}`
 }
@@ -70,8 +70,12 @@ function navigateDate(delta: number) {
 const closedSessions = computed(() => sessions.value.filter(s => s.estado === 'cerrada'))
 const openSessions   = computed(() => sessions.value.filter(s => s.estado === 'abierta'))
 
+function sessionTotal(s: SessionRow): number {
+  return (s.pagos ?? []).reduce((sum, p) => sum + Number(p.monto), 0)
+}
+
 const totalVentas = computed(() =>
-  closedSessions.value.reduce((sum, s) => sum + (Number(s.pagos?.[0]?.monto) || 0), 0)
+  closedSessions.value.reduce((sum, s) => sum + sessionTotal(s), 0)
 )
 const totalCubiertos = computed(() =>
   closedSessions.value.reduce((sum, s) => sum + (s.cubiertos || 1), 0)
@@ -84,11 +88,12 @@ const byMetodo = computed(() => {
   const result: Record<string, { total: number; count: number }> = {}
   METODOS.forEach(m => { result[m.id] = { total: 0, count: 0 } })
   closedSessions.value.forEach(s => {
-    const pago = s.pagos?.[0]
-    if (pago && result[pago.metodo]) {
-      result[pago.metodo].total += Number(pago.monto)
-      result[pago.metodo].count++
-    }
+    (s.pagos ?? []).forEach(pago => {
+      if (result[pago.metodo]) {
+        result[pago.metodo].total += Number(pago.monto)
+        result[pago.metodo].count++
+      }
+    })
   })
   return result
 })
@@ -107,11 +112,12 @@ const cierreYaHecho = computed(() => !!cierre.value)
 const cierreData = computed(() => {
   const totals: Record<string, number> = { total: 0, efectivo: 0, debito: 0, credito: 0, transferencia: 0, mercadopago: 0, pedidosya: 0 }
   closedSessions.value.forEach(s => {
-    const pago = s.pagos?.[0]
-    if (pago && pago.metodo in totals) {
-      totals[pago.metodo] += Number(pago.monto)
-      totals.total += Number(pago.monto)
-    }
+    (s.pagos ?? []).forEach(pago => {
+      if (pago.metodo in totals) {
+        totals[pago.metodo] += Number(pago.monto)
+        totals.total += Number(pago.monto)
+      }
+    })
   })
   return totals
 })
@@ -161,9 +167,8 @@ function exportCSV() {
   let csv = '﻿'
   csv += 'Fecha,Mesa,Apertura,Cierre,Método de pago,Total\n'
   closed.forEach(s => {
-    const pago = s.pagos?.[0]
-    const metodo = pago ? (METODOS.find(m => m.id === pago.metodo)?.label ?? pago.metodo) : ''
-    csv += `"${currentDate.value}","${mesaLabel(s.mesa)}","${new Date(s.created_at).toLocaleString('es-AR')}","${s.closed_at ? new Date(s.closed_at).toLocaleString('es-AR') : ''}","${metodo}","${pago?.monto ?? 0}"\n`
+    const metodos = (s.pagos ?? []).map(p => METODOS.find(m => m.id === p.metodo)?.label ?? p.metodo).join(' + ') || ''
+    csv += `"${currentDate.value}","${mesaLabel(s.mesa)}","${new Date(s.created_at).toLocaleString('es-AR')}","${s.closed_at ? new Date(s.closed_at).toLocaleString('es-AR') : ''}","${metodos}","${sessionTotal(s)}"\n`
   })
   csv += '\nFecha,Producto,Sección,Precio,Cantidad\n'
   allItems.value.filter(i => closedIds.has(i.sesion_id)).forEach(i => {
@@ -177,27 +182,46 @@ function exportCSV() {
 }
 
 // ── Cierre de caja ────────────────────────────────────
-function openCierreModal() {
+const cierreBlockers = ref<string[]>([])
+
+async function openCierreModal() {
   cierreNotas.value = ''
+  cierreBlockers.value = []
+
+  // Verificar precondiciones: no mesas abiertas, no pedidos pendientes
+  const blockers: string[] = []
+  const { data: openSes } = await supabase.from('sesiones').select('id', { count: 'exact' }).eq('estado', 'abierta')
+  if ((openSes?.length ?? 0) > 0) blockers.push(`Hay ${openSes!.length} mesa(s) aún abiertas. Cerrá todas las mesas antes de hacer el cierre.`)
+
+  const { data: pendPed } = await supabase.from('pedidos').select('id', { count: 'exact' }).eq('estado', 'pendiente')
+  if ((pendPed?.length ?? 0) > 0) blockers.push(`Hay ${pendPed!.length} pedido(s) pendientes en cocina. Esperá que estén listos.`)
+
+  cierreBlockers.value = blockers
   cierreVisible.value = true
 }
 
 async function confirmCierre() {
+  if (cierreBlockers.value.length > 0) return
   cierreLoading.value = true
   const d = cierreData.value
-  const now = new Date().toISOString()
   try {
-    await supabase.from('cierres').insert({
+    const { error } = await supabase.from('cierres').insert({
       fecha: currentDate.value,
       total: d.total, efectivo: d.efectivo, debito: d.debito, credito: d.credito,
       transferencia: d.transferencia, mercadopago: d.mercadopago, pedidosya: d.pedidosya,
       notas: cierreNotas.value.trim() || null,
     })
-    await supabase.from('sesiones').update({ estado: 'cerrada', closed_at: now }).eq('estado', 'abierta')
-    await supabase.from('pedidos').update({ estado: 'listo', listo_at: now }).eq('estado', 'pendiente')
+    if (error) throw error
     cierreVisible.value = false
     await loadReport()
-  } catch { alert('Error al guardar el cierre. Intentá de nuevo.') }
+  } catch (e: unknown) {
+    const msg = (e as { message?: string })?.message ?? ''
+    if (msg.includes('unique') || msg.includes('duplicate')) {
+      alert('Ya existe un cierre para este día.')
+    } else {
+      alert('Error al guardar el cierre. Intentá de nuevo.')
+    }
+  }
   cierreLoading.value = false
 }
 
@@ -211,10 +235,11 @@ async function doLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-dark pb-10">
+  <div class="fixed inset-0 flex flex-col bg-dark overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-dark2 border-b border-gold/[.18] px-4 py-3.5 flex items-center gap-2 sticky top-0 z-10">
+    <header class="bg-dark2 border-b border-gold/[.18] px-4 py-3.5 flex items-center gap-2 flex-shrink-0">
+      <button @click="router.replace({ name: 'mesas' })" class="text-gold text-2xl leading-none px-1 pr-2 bg-transparent border-none cursor-pointer">‹</button>
       <span class="font-display text-[1rem] font-black text-gold tracking-[.06em]">Lescano's</span>
       <span class="text-[.58rem] text-gray-500 tracking-[.14em] ml-0.5">— Reportes</span>
       <button @click="doLogout"
@@ -238,7 +263,7 @@ async function doLogout() {
       </button>
     </div>
 
-    <div class="px-4 py-4">
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-10">
       <div v-if="loading" class="text-center py-10 text-gray-500 text-[.85rem]">Cargando...</div>
       <div v-else-if="loadError" class="text-center py-10 text-gray-500 text-[.85rem]">Error al cargar datos. Verificá la conexión.</div>
 
@@ -308,13 +333,15 @@ async function doLogout() {
             </div>
             <div class="flex items-center gap-2 mt-1.5 flex-wrap">
               <span class="text-[.68rem] text-[#aaa]">
-                {{ s.pagos?.[0] ? `${METODOS.find(m => m.id === s.pagos![0].metodo)?.icon ?? ''} ${METODOS.find(m => m.id === s.pagos![0].metodo)?.label ?? s.pagos![0].metodo}` : 'Sin pago registrado' }}
+                {{ (s.pagos?.length ?? 0) > 0
+                  ? s.pagos!.map(p => `${METODOS.find(m => m.id === p.metodo)?.icon ?? ''} ${METODOS.find(m => m.id === p.metodo)?.label ?? p.metodo}`).join(' · ')
+                  : 'Sin pago registrado' }}
               </span>
               <span v-if="s.moza_nombre" class="text-[.62rem] text-gold/70">{{ s.moza_nombre }}</span>
               <span class="text-[.6rem] text-gray-500">{{ sessionItemCount(s.id) }} items · {{ s.cubiertos || 1 }} cub.</span>
-              <span v-if="s.pagos?.[0]?.monto && Number(s.pagos[0].monto) > 0"
+              <span v-if="sessionTotal(s) > 0"
                 class="font-display text-[.9rem] text-gold font-bold ml-auto">
-                ${{ Number(s.pagos[0].monto).toLocaleString('es-AR') }}
+                ${{ sessionTotal(s).toLocaleString('es-AR') }}
               </span>
             </div>
           </div>
@@ -353,17 +380,40 @@ async function doLogout() {
     <!-- Cierre modal -->
     <Transition name="fade">
       <div v-if="cierreVisible" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-5" @click.self="cierreVisible = false">
-        <div class="bg-[#1a1a1a] border border-green-500/30 rounded-[16px] p-6 w-full max-w-[420px]">
-          <div class="font-display text-[1.1rem] font-black text-green-400 mb-1">Cierre de caja</div>
-          <div class="text-[.7rem] text-gray-500 mb-4">{{ formatDate(currentDate) }} — Total: ${{ cierreData.total.toLocaleString('es-AR') }}</div>
-          <textarea v-model="cierreNotas" placeholder="Notas del cierre (opcional)..."
-            class="w-full bg-white/[.05] border border-gold/[.18] text-[#ccc] text-[.8rem] px-2.5 py-2.5 rounded-lg resize-none h-[72px] mb-3 focus:outline-none"
-            style="font-family:inherit"
-          ></textarea>
+        <div :class="['bg-[#1a1a1a] rounded-[16px] p-6 w-full max-w-[420px] border',
+          cierreBlockers.length > 0 ? 'border-red-500/40' : 'border-green-500/30']">
+          <div :class="['font-display text-[1.1rem] font-black mb-1',
+            cierreBlockers.length > 0 ? 'text-red-400' : 'text-green-400']">Cierre de caja</div>
+          <div class="text-[.7rem] text-gray-500 mb-4">{{ formatDate(currentDate) }}</div>
+
+          <!-- Bloqueadores -->
+          <div v-if="cierreBlockers.length > 0" class="mb-4">
+            <div v-for="b in cierreBlockers" :key="b"
+              class="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5 mb-2">
+              <span class="text-red-400 text-[1rem] leading-none flex-shrink-0">⚠</span>
+              <span class="text-[.78rem] text-red-300 leading-snug">{{ b }}</span>
+            </div>
+            <div class="text-[.72rem] text-gray-500 text-center mt-3">Resolvé estos problemas antes de cerrar la caja.</div>
+          </div>
+
+          <!-- Resumen si no hay bloqueos -->
+          <template v-else>
+            <div class="bg-white/[.04] border border-gold/[.1] rounded-lg px-4 py-3 mb-3">
+              <div class="flex justify-between items-center">
+                <span class="text-[.72rem] text-gray-500">Total del día</span>
+                <span class="font-display text-[1.15rem] font-black text-gold">${{ cierreData.total.toLocaleString('es-AR') }}</span>
+              </div>
+            </div>
+            <textarea v-model="cierreNotas" placeholder="Notas del cierre (opcional)..."
+              class="w-full bg-white/[.05] border border-gold/[.18] text-[#ccc] text-[.8rem] px-2.5 py-2.5 rounded-lg resize-none h-[64px] mb-3 focus:outline-none"
+              style="font-family:inherit"
+            ></textarea>
+          </template>
+
           <div class="flex gap-2">
             <button @click="cierreVisible = false"
-              class="px-4 py-3 text-gray-500 border border-gold/[.18] rounded-lg text-[.85rem] bg-transparent cursor-pointer">Cancelar</button>
-            <button @click="confirmCierre" :disabled="cierreLoading"
+              class="px-4 py-3 text-gray-500 border border-gold/[.18] rounded-lg text-[.85rem] bg-transparent cursor-pointer">Cerrar</button>
+            <button v-if="cierreBlockers.length === 0" @click="confirmCierre" :disabled="cierreLoading"
               class="flex-1 py-3 bg-[#2a6f2a] text-white border-none rounded-lg font-bold text-[.85rem] cursor-pointer disabled:opacity-50">
               {{ cierreLoading ? 'Guardando...' : 'Confirmar cierre' }}
             </button>

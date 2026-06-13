@@ -30,10 +30,21 @@ const pendingOrders = computed(() => orders.value.filter(o => o.estado === 'pend
 const doneOrders    = computed(() => orders.value.filter(o => o.estado === 'listo'))
 
 // ── Helpers ───────────────────────────────────────────
-function mesaLabel(mesa: string | undefined): string {
-  if (!mesa) return 'DESCONOCIDO'
+interface SesionRef { mesa?: string; tipo?: string; cliente_nombre?: string; cliente_direccion?: string }
+
+function mesaLabel(sesion: SesionRef | string | undefined): string {
+  if (!sesion) return 'DESCONOCIDO'
+  const s: SesionRef = typeof sesion === 'string' ? { mesa: sesion } : sesion
+  const mesa = s.mesa ?? ''
   if (mesa === 'llevar') return 'PARA LLEVAR'
-  if (mesa.startsWith('envio_')) return 'ENVÍO'
+  if (mesa.startsWith('llevar_')) {
+    return s.cliente_nombre ? `LLEVAR — ${s.cliente_nombre}` : 'PARA LLEVAR'
+  }
+  if (mesa.startsWith('envio_')) {
+    if (s.cliente_nombre && s.cliente_direccion) return `ENVÍO — ${s.cliente_nombre} · ${s.cliente_direccion}`
+    if (s.cliente_nombre) return `ENVÍO — ${s.cliente_nombre}`
+    return 'ENVÍO'
+  }
   return `MESA ${mesa.replace('mesa_', '')}`
 }
 
@@ -107,12 +118,12 @@ async function loadOrders() {
     const [{ data: pending }, { data: done }] = await Promise.all([
       supabase
         .from('pedidos')
-        .select('*, sesiones(mesa), pedido_items(*)')
+        .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')
         .eq('estado', 'pendiente')
         .order('created_at', { ascending: true }),
       supabase
         .from('pedidos')
-        .select('*, sesiones(mesa), pedido_items(*)')
+        .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')
         .eq('estado', 'listo')
         .gte('listo_at', listoDesde)
         .order('listo_at', { ascending: false })
@@ -167,22 +178,22 @@ function setupRealtime() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, async payload => {
       const { data } = await supabase
         .from('pedidos')
-        .select('*, sesiones(mesa), pedido_items(*)')
+        .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')
         .eq('id', payload.new.id)
         .single()
       if (data) {
         orders.value.unshift(data as Pedido)
         const tipo = data.tipo
-        const mesa = (data as Pedido).sesiones?.mesa
+        const sesRef = (data as Pedido).sesiones
         if (tipo === 'cambio') {
           playBeep([1000, 800, 600])
-          showFlash(`⚠️ CAMBIO — ${mesaLabel(mesa)}`)
+          showFlash(`⚠️ CAMBIO — ${mesaLabel(sesRef)}`)
         } else if (tipo === 'cancelacion') {
           playBeep([1000, 800, 600])
-          showFlash(`🚫 CANCELAR — ${mesaLabel(mesa)}`)
+          showFlash(`🚫 CANCELAR — ${mesaLabel(sesRef)}`)
         } else {
           playBeep([880, 1100])
-          showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(mesa)}`)
+          showFlash(`🔔 NUEVO PEDIDO — ${mesaLabel(sesRef)}`)
         }
         markNew(data.id)
       }
@@ -227,7 +238,7 @@ async function doLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0a0a0a] text-white" style="font-family:'Lato',sans-serif">
+  <div class="fixed inset-0 flex flex-col bg-[#0a0a0a] text-white overflow-hidden" style="font-family:'Lato',sans-serif">
 
     <!-- Flash notification -->
     <Transition name="flash">
@@ -252,6 +263,10 @@ async function doLogout() {
           class="border border-gold/20 text-gold text-[.72rem] px-3 py-1.5 rounded-md bg-transparent cursor-pointer tracking-[.06em]">
           ↻ Actualizar
         </button>
+        <button v-if="auth.can('dueno')" @click="router.replace({ name: 'mesas' })"
+          class="border border-gold/20 text-gold/60 text-[.62rem] px-2.5 py-1 rounded bg-transparent cursor-pointer tracking-[.08em]">
+          ← Mesas
+        </button>
         <button @click="doLogout"
           class="border border-gold/30 text-gold/70 text-[.62rem] px-2.5 py-1 rounded bg-transparent cursor-pointer tracking-[.08em]">
           Salir
@@ -272,7 +287,7 @@ async function doLogout() {
     </div>
 
     <!-- Main content -->
-    <div class="px-3.5 py-4 pb-10">
+    <div class="flex-1 overflow-y-auto px-3.5 py-4 pb-10">
 
       <!-- Error state -->
       <div v-if="loadError" class="text-center py-12 text-[#666]">
@@ -315,7 +330,7 @@ async function doLogout() {
                                              'bg-gold/[.08] border-gold/20'
             ]">
               <span class="font-display text-[1.3rem] font-black text-gold flex-1 tracking-[.04em]">
-                {{ mesaLabel(order.sesiones?.mesa) }}
+                {{ mesaLabel(order.sesiones) }}
               </span>
               <span v-if="order.tipo === 'cambio'"
                 class="text-[.62rem] font-black text-[#E89500] tracking-[.12em] bg-[#E89500]/15 px-2 py-0.5 rounded-md">
@@ -338,6 +353,8 @@ async function doLogout() {
                 <span class="font-display text-[1.05rem] font-black text-gold min-w-[28px] flex-shrink-0 leading-tight">{{ item.qty }}×</span>
                 <div class="flex-1">
                   <div class="text-[.95rem] font-bold text-white leading-tight">{{ item.nombre }}</div>
+                  <div v-if="item.seccion && item.seccion !== 'CANCELACION' && item.seccion !== 'CAMBIO'"
+                    class="text-[.62rem] text-gold/45 tracking-[.08em] uppercase mt-0.5">{{ item.seccion }}</div>
                   <div v-if="item.nota" class="text-[.72rem] text-[#aaa] italic mt-0.5 leading-snug">📝 {{ item.nota }}</div>
                 </div>
               </div>
@@ -366,7 +383,7 @@ async function doLogout() {
             <div v-for="order in doneOrders" :key="order.id"
               class="bg-[#1e1e1e] border border-white/[.06] rounded-[10px] px-3.5 py-2.5 flex items-center gap-2.5 flex-wrap">
               <span class="text-green-400 text-[.9rem] flex-shrink-0">✓</span>
-              <span class="text-[.82rem] font-bold text-[#aaa] flex-shrink-0">{{ mesaLabel(order.sesiones?.mesa) }}</span>
+              <span class="text-[.82rem] font-bold text-[#aaa] flex-shrink-0">{{ mesaLabel(order.sesiones) }}</span>
               <span class="text-[.75rem] text-[#666] flex-1 leading-snug">
                 <template v-for="(item, i) in (order.pedido_items || [])" :key="item.id">
                   <span v-if="i > 0"> · </span>

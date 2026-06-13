@@ -8,6 +8,7 @@ const LoginPage   = () => import('@/pages/LoginPage.vue')
 const MesasPage   = () => import('@/pages/MesasPage.vue')
 const KitchenPage = () => import('@/pages/KitchenPage.vue')
 const ReportsPage = () => import('@/pages/ReportsPage.vue')
+const UsersPage   = () => import('@/pages/UsersPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -46,6 +47,12 @@ const router = createRouter({
       name: 'reportes',
       component: ReportsPage,
       meta: { requiresAuth: true, roles: ['caja', 'dueno'] },
+    },
+    {
+      path: '/usuarios',
+      name: 'usuarios',
+      component: UsersPage,
+      meta: { requiresAuth: true, roles: ['dueno'] },
     },
     {
       path: '/:pathMatch(.*)*',

@@ -26,7 +26,10 @@ export const useCartStore = defineStore('cart', () => {
   )
   const mesaLabel = computed(() => {
     if (!mesaKey.value) return ''
-    if (mesaKey.value === 'llevar') return 'Para llevar'
+    if (mesaKey.value === 'llevar' || mesaKey.value.startsWith('llevar_'))
+      return currentSession.value?.cliente_nombre
+        ? `Llevar — ${currentSession.value.cliente_nombre}`
+        : 'Para llevar'
     if (mesaKey.value.startsWith('envio_'))
       return currentSession.value?.cliente_nombre
         ? `Envío — ${currentSession.value.cliente_nombre}`
@@ -40,9 +43,7 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   function lsKey(): string {
-    return mesaKey.value === 'llevar'
-      ? 'lescanos_order_llevar'
-      : `lescanos_order_${mesaKey.value}`
+    return `lescanos_order_${mesaKey.value ?? 'unknown'}`
   }
 
   function cartLoad() {
@@ -107,11 +108,13 @@ export const useCartStore = defineStore('cart', () => {
       cubiertos.value = data[0].cubiertos || 1
       await loadSessionItems()
     } else {
+      const tipo = key.startsWith('envio_') ? 'envio' : key.startsWith('llevar') ? 'llevar' : 'mesa'
       const { data: created, error } = await supabase
         .from('sesiones')
         .insert({
           mesa: key,
           estado: 'abierta',
+          tipo,
           moza_id: auth.currentUser?.id ?? null,
           moza_nombre: auth.currentUser?.nombre ?? null,
         })
@@ -209,6 +212,24 @@ export const useCartStore = defineStore('cart', () => {
     })
   }
 
+  async function addPago(metodo: string, monto: number) {
+    if (!currentSession.value || !metodo) return
+    await supabase.from('pagos').insert({
+      sesion_id: currentSession.value.id,
+      metodo,
+      monto,
+    })
+  }
+
+  async function closeSessionOnly() {
+    if (!currentSession.value) { clearState(); return }
+    await supabase
+      .from('sesiones')
+      .update({ estado: 'cerrada', closed_at: new Date().toISOString(), cubiertos: cubiertos.value })
+      .eq('id', currentSession.value.id)
+    clearState()
+  }
+
   async function closeSession(metodo: string, monto: number) {
     if (!currentSession.value) {
       clearState()
@@ -280,7 +301,7 @@ export const useCartStore = defineStore('cart', () => {
     parsePrecio, cartLoad, cartClear,
     addItem, removeItem, removeCartEntry, setItemNote,
     openOrLoadSession, loadSessionItems, setCubiertos,
-    saveOrder, sendCambio, sendCancelacion, closeSession, deleteSessionIfEmpty, clearState,
+    saveOrder, sendCambio, sendCancelacion, addPago, closeSessionOnly, closeSession, deleteSessionIfEmpty, clearState,
     buildMsg,
   }
 })

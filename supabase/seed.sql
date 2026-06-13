@@ -1,12 +1,13 @@
 -- ═══════════════════════════════════════════════════════════════════
 --  Seed de desarrollo
 --
---  Los perfiles y usuarios de auth se crean con seed-auth.sh,
---  que debe ejecutarse DESPUÉS del db reset porque los perfiles
---  tienen FK a auth.users (que GoTrue crea con su propia API).
---
---  Ejecutar después del reset:
---    bash supabase/seed-auth.sh
+--  USUARIOS: correr seed-auth.ps1 después de cada db reset.
+--  Crea los usuarios en GoTrue y sincroniza perfiles con los UUIDs reales.
+--    powershell.exe -ExecutionPolicy Bypass -File ./supabase/seed-auth.ps1
 -- ═══════════════════════════════════════════════════════════════════
 
--- (vacío intencionalmente — ver seed-auth.sh)
+-- Configuración por defecto
+INSERT INTO config (clave, valor) VALUES
+  ('num_mesas','8'),
+  ('costo_envio','0')
+ON CONFLICT (clave) DO NOTHING;

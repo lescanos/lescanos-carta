@@ -19,7 +19,7 @@ export interface CurrentUser {
 
 // ── SESIONES ───────────────────────────────────────────────────────────────
 export type EstadoSesion = 'abierta' | 'cerrada'
-export type TipoSesion = 'mesa' | 'envio'
+export type TipoSesion = 'mesa' | 'envio' | 'llevar'
 
 export interface Sesion {
   id: string
@@ -33,6 +33,7 @@ export interface Sesion {
   cliente_telefono: string | null
   cliente_direccion: string | null
   cliente_referencia: string | null
+  metodo_pago: string | null
   created_at: string
   closed_at: string | null
 }

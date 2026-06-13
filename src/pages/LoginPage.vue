@@ -30,9 +30,8 @@ onMounted(async () => {
   }
 
   const { data } = await supabase
-    .from('perfiles')
-    .select('id, nombre, login_key, rol, emoji, activo')
-    .eq('activo', true)
+    .from('perfiles_publicos')
+    .select('id, nombre, login_key, emoji, activo')
     .order('nombre')
 
   perfiles.value = (data as Perfil[]) ?? []

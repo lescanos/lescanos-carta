@@ -12,13 +12,14 @@ const auth   = useAuthStore()
 const cart   = useCartStore()
 
 // ── View state ────────────────────────────────────────
-type View = 'mesas' | 'menu' | 'resumen'
+type View = 'mesas' | 'menu' | 'resumen' | 'split'
 const view = ref<View>('mesas')
 
 // ── Mesa grid state ───────────────────────────────────
 const numMesas         = ref(8)
 const openSessions     = ref<Record<string, Sesion>>({})
 const deliverySessions = ref<Sesion[]>([])
+const llevarSessions   = ref<Sesion[]>([])
 
 // ── Menu state ────────────────────────────────────────
 type ItemMeta = {
@@ -47,6 +48,12 @@ const delNombre      = ref('')
 const delTel         = ref('')
 const delDir         = ref('')
 const delRef         = ref('')
+const delMetodo      = ref('')
+
+const llevarFormVisible = ref(false)
+const llevarNombre      = ref('')
+const llevarTel         = ref('')
+const llevarDir         = ref('')
 
 // Listo notification
 const listoText    = ref('')
@@ -58,11 +65,17 @@ const fallbackMsg  = ref('')
 const showFallback = ref(false)
 const sendingOrder = ref(false)
 
+// Split billing
+const splitCount        = ref(2)
+const splitAssignment   = ref<Record<string, number>>({})
+const splitPaid         = ref<boolean[]>([false, false])
+const splitPayingPerson = ref(-1)
+
 // Realtime
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null
 let listoChannel:    ReturnType<typeof supabase.channel> | null = null
 
-const WA_NUMBER = '__WA_NUMBER__'
+const WA_NUMBER = import.meta.env.VITE_WA_NUMBER ?? ''
 
 // ── Menu data ─────────────────────────────────────────
 function getMenu(): MenuPagina[] {
@@ -74,42 +87,47 @@ function getMenu(): MenuPagina[] {
 }
 
 // ── Config from Supabase ──────────────────────────────
+const costoEnvio = ref(0)
+
 async function loadConfig() {
-  const { data } = await supabase.from('config').select('clave,valor').eq('clave', 'num_mesas').single()
-  if (data) numMesas.value = parseInt(data.valor) || 8
+  const { data } = await supabase.from('config').select('clave,valor').in('clave', ['num_mesas', 'costo_envio'])
+  data?.forEach(row => {
+    if (row.clave === 'num_mesas') numMesas.value = parseInt(row.valor) || 8
+    if (row.clave === 'costo_envio') costoEnvio.value = parseInt(row.valor) || 0
+  })
 }
 
 // ── Open sessions ─────────────────────────────────────
 async function loadOpenSessions() {
   openSessions.value = {}
   deliverySessions.value = []
+  llevarSessions.value = []
   const { data, error } = await supabase
     .from('sesiones')
-    .select('mesa,id,created_at,tipo,moza_id,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia,cubiertos,estado,closed_at')
+    .select('mesa,id,created_at,tipo,moza_id,moza_nombre,cliente_nombre,cliente_telefono,cliente_direccion,cliente_referencia,metodo_pago,cubiertos,estado,closed_at')
     .eq('estado', 'abierta')
   if (error) return
   ;(data as Sesion[]).forEach(s => {
     if (s.tipo === 'envio') deliverySessions.value.push(s)
+    else if (s.tipo === 'llevar') llevarSessions.value.push(s)
     else openSessions.value[s.mesa] = s
   })
 }
 
 // ── Mesa grid items ───────────────────────────────────
 const mesaItems = computed(() => {
-  type MesaItem = { key: string; num: string | null; active: boolean; moza: string | null; isLlevar?: boolean }
+  type MesaItem = { key: string; num: string; active: boolean; moza: string | null }
   const items: MesaItem[] = []
   for (let i = 1; i <= numMesas.value; i++) {
     const key = `mesa_${i}`
     const sess = openSessions.value[key]
     items.push({ key, num: String(i), active: !!sess, moza: sess?.moza_nombre ?? null })
   }
-  const llevar = openSessions.value['llevar']
-  items.push({ key: 'llevar', num: null, active: !!llevar, moza: llevar?.moza_nombre ?? null, isLlevar: true })
   return items
 })
 
 function mesaKeyLabel(key: string): string {
-  if (key === 'llevar') return 'Para llevar'
+  if (key === 'llevar' || key.startsWith('llevar_')) return 'Para llevar'
   if (key.startsWith('envio_')) return 'Envío'
   return `Mesa ${key.replace('mesa_', '')}`
 }
@@ -183,6 +201,44 @@ function buildItemsMap() {
 }
 
 const currentPage = computed<MenuPagina | null>(() => menuPages.value[pageIdx.value] ?? null)
+
+// ── Cancelados ────────────────────────────────────────
+// Nombres de ítems que tienen una entrada de CANCELACION en sessionItems
+const cancelledNames = computed(() =>
+  new Set(cart.sessionItems.filter(i => i.seccion === 'CANCELACION').map(i => i.nombre))
+)
+
+// sessionItems visibles: sin CANCELACION ni CAMBIO
+const sessionItemsDisplay = computed(() =>
+  cart.sessionItems.filter(i => i.seccion !== 'CANCELACION' && i.seccion !== 'CAMBIO')
+)
+
+// Total ajustado: sin ítems cancelados ni CAMBIO/CANCELACION
+const sessionTotalAdjusted = computed(() =>
+  sessionItemsDisplay.value
+    .filter(i => !cancelledNames.value.has(i.nombre))
+    .reduce((s, i) => s + cart.parsePrecio(i.precio) * i.qty, 0)
+)
+
+const grandTotalAdjusted = computed(() => {
+  const base = cart.cartTotal + sessionTotalAdjusted.value
+  return cart.mesaKey?.startsWith('envio_') ? base + costoEnvio.value : base
+})
+
+const allSplitItems = computed(() => {
+  const out: Array<{ splitKey: string; nombre: string; precio?: string; qty: number; nota?: string; isCart: boolean }> = []
+  cart.cart.forEach((item, idx) => out.push({ nombre: item.nombre, precio: item.precio, qty: item.qty, nota: item.nota, splitKey: `c${idx}`, isCart: true }))
+  cart.sessionItems.forEach((item, idx) => out.push({ nombre: item.nombre, precio: item.precio ?? undefined, qty: item.qty, nota: item.nota ?? undefined, splitKey: `s${idx}`, isCart: false }))
+  return out
+})
+
+const splitTotals = computed(() =>
+  Array.from({ length: splitCount.value }, (_, pi) =>
+    allSplitItems.value
+      .filter(item => (splitAssignment.value[item.splitKey] ?? 0) === pi)
+      .reduce((s, item) => s + cart.parsePrecio(item.precio) * item.qty, 0)
+  )
+)
 
 function cartQty(id: string): number {
   return cart.cart.find(c => c.id === id)?.qty ?? 0
@@ -266,6 +322,7 @@ async function confirmarCancelacion(item: PedidoItem) {
 
 // ── Send to kitchen ───────────────────────────────────
 async function sendOrder() {
+  if (sendingOrder.value) return
   sendingOrder.value = true
   try {
     const saved = await cart.saveOrder()
@@ -285,6 +342,29 @@ async function sendOrder() {
 async function copyFallback() {
   try { await navigator.clipboard.writeText(fallbackMsg.value); showToast('Copiado al portapapeles ✓') }
   catch { showToast('Seleccioná el texto y copialo manualmente') }
+}
+
+// ── Split billing ─────────────────────────────────────
+function openSplit() {
+  splitAssignment.value = {}
+  splitPaid.value = Array(splitCount.value).fill(false) as boolean[]
+  view.value = 'split'
+}
+
+function setSplitCount(n: number) {
+  splitCount.value = n
+  splitAssignment.value = {}
+  splitPaid.value = Array(n).fill(false) as boolean[]
+}
+
+function toggleSplitItem(key: string) {
+  splitAssignment.value = { ...splitAssignment.value, [key]: ((splitAssignment.value[key] ?? 0) + 1) % splitCount.value }
+}
+
+function paySplitPerson(personIdx: number) {
+  splitPayingPerson.value = personIdx
+  selectedPay.value = ''
+  payVisible.value = true
 }
 
 // ── Send delivery WA ──────────────────────────────────
@@ -315,14 +395,35 @@ function openPayment() {
   if (cart.cart.length > 0) {
     if (!confirm('Hay items pendientes de envío. ¿Cerrar la mesa igual?')) return
   }
-  selectedPay.value = ''
+  selectedPay.value = cart.currentSession?.metodo_pago ?? ''
   payVisible.value = true
 }
 
 async function confirmPayment() {
   if (!selectedPay.value) return
   payVisible.value = false
-  await cart.closeSession(selectedPay.value, cart.grandTotal)
+
+  if (splitPayingPerson.value >= 0) {
+    const personIdx = splitPayingPerson.value
+    const monto = splitTotals.value[personIdx]
+    splitPayingPerson.value = -1
+    try {
+      await cart.addPago(selectedPay.value, monto)
+      splitPaid.value[personIdx] = true
+      if (splitPaid.value.every(p => p)) {
+        await cart.closeSessionOnly()
+        showFallback.value = false
+        await loadOpenSessions()
+        view.value = 'mesas'
+        showToast('Mesa cerrada ✓')
+      } else {
+        showToast(`Persona ${personIdx + 1} cobrada ✓`)
+      }
+    } catch { showToast('Error al registrar el pago') }
+    return
+  }
+
+  await cart.closeSession(selectedPay.value, grandTotalAdjusted.value)
   showFallback.value = false
   await loadOpenSessions()
   view.value = 'mesas'
@@ -331,7 +432,7 @@ async function confirmPayment() {
 
 // ── Delivery form ─────────────────────────────────────
 function openDeliveryForm() {
-  delNombre.value = delTel.value = delDir.value = delRef.value = ''
+  delNombre.value = delTel.value = delDir.value = delRef.value = delMetodo.value = ''
   delFormVisible.value = true
 }
 
@@ -350,6 +451,7 @@ async function confirmDelivery() {
         cliente_telefono: delTel.value.trim() || null,
         cliente_direccion: delDir.value.trim(),
         cliente_referencia: delRef.value.trim() || null,
+        metodo_pago: delMetodo.value || null,
       })
       .select().single()
     if (error) throw error
@@ -367,6 +469,53 @@ async function confirmDelivery() {
 }
 
 async function enterEnvio(sesion: Sesion) {
+  cart.mesaKey = sesion.mesa
+  cart.cartLoad()
+  pageIdx.value = 0
+  menuPages.value = getMenu()
+  buildItemsMap()
+  showFallback.value = false
+  view.value = 'menu'
+  try { await cart.openOrLoadSession(sesion.mesa) } catch { showToast('Sin conexión') }
+}
+
+// ── Para llevar form ──────────────────────────────────
+function openLlevarForm() {
+  llevarNombre.value = llevarTel.value = llevarDir.value = ''
+  llevarFormVisible.value = true
+}
+
+async function confirmLlevar() {
+  if (!llevarNombre.value.trim()) { showToast('Ingresá el nombre del cliente'); return }
+  llevarFormVisible.value = false
+  const mesaKey = `llevar_${Date.now()}`
+  try {
+    const { data: created, error } = await supabase
+      .from('sesiones')
+      .insert({
+        mesa: mesaKey, estado: 'abierta', tipo: 'llevar',
+        moza_id: auth.currentUser?.id ?? null,
+        moza_nombre: auth.currentUser?.nombre ?? null,
+        cliente_nombre: llevarNombre.value.trim(),
+        cliente_telefono: llevarTel.value.trim() || null,
+        cliente_direccion: llevarDir.value.trim() || null,
+      })
+      .select().single()
+    if (error) throw error
+    cart.mesaKey = mesaKey
+    cart.currentSession = created as Sesion
+    cart.sessionItems = []
+    cart.cubiertos = 1
+    cart.cart = []
+    pageIdx.value = 0
+    menuPages.value = getMenu()
+    buildItemsMap()
+    showFallback.value = false
+    view.value = 'menu'
+  } catch { showToast('Error al crear el pedido para llevar') }
+}
+
+async function enterLlevar(sesion: Sesion) {
   cart.mesaKey = sesion.mesa
   cart.cartLoad()
   pageIdx.value = 0
@@ -485,8 +634,20 @@ async function doLogout() {
         <span class="font-display text-[1.05rem] font-black text-gold tracking-[.06em]">Lescano's</span>
         <span class="text-[.6rem] text-gray-500 tracking-[.14em] ml-0.5">— Pedidos</span>
         <span class="flex-1 text-right text-[.6rem] text-gray-500">{{ auth.currentUser?.nombre }}</span>
+        <button v-if="auth.can('dueno')" @click="router.push({ name: 'cocina' })"
+          class="text-[.6rem] text-gold/60 border border-gold/20 px-2 py-1 rounded tracking-wider bg-transparent cursor-pointer">
+          🍳 Cocina
+        </button>
+        <button v-if="auth.can('caja', 'dueno')" @click="router.push({ name: 'reportes' })"
+          class="text-[.6rem] text-gold/60 border border-gold/20 px-2 py-1 rounded tracking-wider bg-transparent cursor-pointer">
+          📊 Reportes
+        </button>
+        <button v-if="auth.can('dueno')" @click="router.push({ name: 'usuarios' })"
+          class="text-[.6rem] text-gold/60 border border-gold/20 px-2 py-1 rounded tracking-wider bg-transparent cursor-pointer">
+          👥 Usuarios
+        </button>
         <button @click="doLogout"
-          class="text-[.6rem] text-gold/70 border border-gold/30 px-2 py-1 rounded ml-2 tracking-wider bg-transparent cursor-pointer">
+          class="text-[.6rem] text-gold/70 border border-gold/30 px-2 py-1 rounded ml-1 tracking-wider bg-transparent cursor-pointer">
           Salir
         </button>
       </header>
@@ -498,27 +659,34 @@ async function doLogout() {
             v-for="m in mesaItems" :key="m.key"
             @click="handleMesaClick(m.key)"
             :class="[
-              'bg-dark2 border-2 rounded-xl text-center flex flex-col items-center justify-center gap-1 min-h-[78px] transition-colors cursor-pointer',
-              m.isLlevar ? 'col-span-3 flex-row gap-2.5 px-4 py-4' : 'py-4 px-2',
+              'bg-dark2 border-2 rounded-xl text-center flex flex-col items-center justify-center gap-1 min-h-[78px] py-4 px-2 transition-colors cursor-pointer',
               m.active ? 'border-gold/70 bg-gold/[.07]' : 'border-gold/[.18]',
             ]"
           >
-            <template v-if="m.isLlevar">
-              <span class="text-xl">🛍️</span>
-              <span class="text-[.95rem] font-bold text-gold tracking-[.04em]">Para llevar</span>
-              <template v-if="m.active">
-                <span class="w-1.5 h-1.5 rounded-full bg-gold opacity-80"></span>
-                <span v-if="m.moza" class="text-[.62rem] text-gray-400 ml-1">{{ m.moza }}</span>
-              </template>
+            <span class="font-display text-[1.35rem] font-black text-gold">{{ m.num }}</span>
+            <span class="text-[.58rem] text-gray-500 tracking-[.12em] uppercase">Mesa</span>
+            <template v-if="m.active">
+              <span class="w-1.5 h-1.5 rounded-full bg-gold opacity-80"></span>
+              <span v-if="m.moza" class="text-[.62rem] text-gray-400 max-w-[100px] truncate">{{ m.moza }}</span>
             </template>
-            <template v-else>
-              <span class="font-display text-[1.35rem] font-black text-gold">{{ m.num }}</span>
-              <span class="text-[.58rem] text-gray-500 tracking-[.12em] uppercase">Mesa</span>
-              <template v-if="m.active">
-                <span class="w-1.5 h-1.5 rounded-full bg-gold opacity-80"></span>
-                <span v-if="m.moza" class="text-[.62rem] text-gray-400 max-w-[100px] truncate">{{ m.moza }}</span>
-              </template>
-            </template>
+          </button>
+        </div>
+
+        <!-- Para llevar -->
+        <div class="text-[.65rem] text-gray-500 tracking-[.18em] uppercase px-4 pt-1 pb-1.5">🛍️ Para llevar</div>
+        <div class="grid grid-cols-3 gap-2.5 px-4 pb-4">
+          <button v-for="s in llevarSessions" :key="s.id" @click="enterLlevar(s)"
+            class="bg-dark2 border-2 border-gold/60 bg-gold/[.05] rounded-xl py-4 px-2
+                   text-center flex flex-col items-center justify-center gap-1 min-h-[78px] cursor-pointer">
+            <span class="text-lg">🛍️</span>
+            <span class="text-[.6rem] text-gold tracking-[.04em] uppercase truncate max-w-[80px]">{{ s.cliente_nombre || 'Cliente' }}</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-gold opacity-80"></span>
+          </button>
+          <button @click="openLlevarForm"
+            class="bg-dark2 border-2 border-gold/[.18] rounded-xl py-4 px-2
+                   text-center flex flex-col items-center justify-center gap-1 min-h-[78px] cursor-pointer">
+            <span class="text-lg">🛍️</span>
+            <span class="text-[.58rem] text-gray-500 tracking-[.1em] uppercase">Nuevo llevar</span>
           </button>
         </div>
 
@@ -658,7 +826,6 @@ async function doLogout() {
           :disabled="cart.cartCount === 0 && cart.sessionItems.length === 0"
           class="w-full py-3.5 bg-gold text-dark font-bold text-[.95rem] rounded-[10px] tracking-[.04em]
                  disabled:bg-gold/22 disabled:text-black/35 active:opacity-80 transition-opacity pointer-events-auto"
-          style="background:var(--tw-bg-opacity,1)"
         >
           <span v-if="cart.cartCount > 0">Ver resumen · {{ cart.cartCount }} item{{ cart.cartCount !== 1 ? 's' : '' }}</span>
           <span v-else-if="cart.sessionItems.length > 0">Ver cuenta de la mesa</span>
@@ -672,6 +839,10 @@ async function doLogout() {
       <header class="bg-dark2 border-b border-gold/[.18] px-4 py-3 flex items-center gap-2 flex-shrink-0 min-h-[52px]">
         <button @click="view = 'menu'" class="text-gold text-2xl leading-none px-1 pr-2 bg-transparent border-none cursor-pointer">‹</button>
         <span class="flex-1 text-[.95rem] font-bold text-gold">{{ cart.mesaLabel }}</span>
+        <button v-if="cart.cart.length + cart.sessionItems.length > 0" @click="openSplit"
+          class="text-[.65rem] text-gold/60 border border-gold/25 px-2.5 py-1 rounded tracking-wider bg-transparent cursor-pointer flex-shrink-0">
+          Dividir
+        </button>
       </header>
 
       <div class="flex-1 overflow-y-auto pb-44">
@@ -681,7 +852,7 @@ async function doLogout() {
         </div>
         <template v-else>
           <div v-if="cart.cart.length > 0">
-            <div v-if="cart.sessionItems.length > 0"
+            <div v-if="sessionItemsDisplay.length > 0"
               class="px-4 pt-2.5 pb-1 text-[.55rem] text-gray-500 tracking-[.18em] uppercase">Pendiente de envío</div>
             <div v-for="(item, idx) in cart.cart" :key="idx"
               class="flex items-center px-4 py-3.5 border-b border-white/[.05] gap-3">
@@ -700,18 +871,24 @@ async function doLogout() {
             </div>
           </div>
 
-          <div v-if="cart.sessionItems.length > 0">
+          <div v-if="sessionItemsDisplay.length > 0">
             <div v-if="cart.cart.length > 0"
               class="px-4 pt-2.5 pb-1 text-[.55rem] text-gray-500 tracking-[.18em] uppercase">Ya enviado</div>
-            <div v-for="(item, idx) in cart.sessionItems" :key="idx"
-              class="flex items-center px-4 py-3.5 border-b border-white/[.05] gap-3 opacity-45">
+            <div v-for="(item, idx) in sessionItemsDisplay" :key="idx"
+              :class="['flex items-center px-4 py-3.5 border-b border-white/[.05] gap-3',
+                cancelledNames.has(item.nombre) ? 'opacity-35' : 'opacity-45']">
               <div class="bg-gold/40 text-black/50 text-[.75rem] font-bold rounded-[6px] px-2 py-0.5 flex-shrink-0">×{{ item.qty }}</div>
               <div class="flex-1 min-w-0">
-                <div class="text-[.9rem] text-white font-medium">{{ item.nombre }}</div>
-                <div v-if="item.nota" class="text-[.65rem] text-gray-500 italic mt-0.5">📝 {{ item.nota }}</div>
+                <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white']">
+                  {{ item.nombre }}
+                </div>
+                <div v-if="cancelledNames.has(item.nombre)"
+                  class="text-[.6rem] text-red-400/60 tracking-[.06em] uppercase mt-0.5">Cancelado</div>
+                <div v-else-if="item.nota" class="text-[.65rem] text-gray-500 italic mt-0.5">📝 {{ item.nota }}</div>
               </div>
-              <div v-if="item.precio && item.precio !== '$0'" class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
-              <div class="flex gap-1 flex-shrink-0">
+              <div v-if="item.precio && item.precio !== '$0' && !cancelledNames.has(item.nombre)"
+                class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
+              <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
                 <button @click.stop="openCambio(item)"
                   class="border border-[#E89500]/50 text-[#E89500] text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
                   ⚠ Cambiar
@@ -724,10 +901,15 @@ async function doLogout() {
             </div>
           </div>
 
+          <div v-if="cart.mesaKey?.startsWith('envio_') && costoEnvio > 0"
+            class="flex justify-between items-center px-4 py-2.5 border-t border-white/[.05]">
+            <span class="text-[.82rem] text-gray-500">🛵 Costo de envío</span>
+            <span class="font-display text-[.9rem] text-gold">${{ costoEnvio.toLocaleString('es-AR') }}</span>
+          </div>
           <div v-if="cart.hasRealPrices"
             class="flex justify-between items-center px-4 py-3.5 border-t border-gold/[.22]">
-            <span class="text-[.85rem] text-gray-500 font-bold">{{ cart.sessionItems.length > 0 ? 'Total de la cuenta' : 'Total estimado' }}</span>
-            <span class="font-display text-[1.1rem] font-bold text-gold">${{ cart.grandTotal.toLocaleString('es-AR') }}</span>
+            <span class="text-[.85rem] text-gray-500 font-bold">{{ sessionItemsDisplay.length > 0 ? 'Total de la cuenta' : 'Total estimado' }}</span>
+            <span class="font-display text-[1.1rem] font-bold text-gold">${{ grandTotalAdjusted.toLocaleString('es-AR') }}</span>
           </div>
         </template>
 
@@ -763,6 +945,73 @@ async function doLogout() {
           class="w-full mt-2 py-2.5 text-red-400/70 border-[1.5px] border-red-500/30 text-[.82rem] font-bold rounded-[10px] tracking-[.04em] bg-transparent cursor-pointer">
           Cerrar mesa
         </button>
+      </div>
+    </template>
+
+    <!-- ══════════════════════════════════════ SPLIT ══ -->
+    <template v-else-if="view === 'split'">
+      <header class="bg-dark2 border-b border-gold/[.18] px-4 py-3 flex items-center gap-2 flex-shrink-0 min-h-[52px]">
+        <button @click="view = 'resumen'" class="text-gold text-2xl leading-none px-1 pr-2 bg-transparent border-none cursor-pointer">‹</button>
+        <span class="flex-1 text-[.95rem] font-bold text-gold">Dividir — {{ cart.mesaLabel }}</span>
+        <div class="flex gap-1">
+          <button v-for="n in [2, 3, 4]" :key="n" @click="setSplitCount(n)"
+            :class="['text-[.65rem] font-bold px-2.5 py-1 rounded border cursor-pointer transition-colors',
+              splitCount === n ? 'bg-gold text-dark border-gold' : 'text-gold/50 border-gold/20 bg-transparent']">
+            {{ n }}p
+          </button>
+        </div>
+      </header>
+
+      <div class="text-[.55rem] text-gray-500 tracking-[.14em] uppercase text-center py-2 px-4 flex-shrink-0">
+        Tocá un ítem para asignarlo a otra persona
+      </div>
+
+      <div class="flex-1 overflow-y-auto pb-[200px]">
+        <div v-if="allSplitItems.length === 0" class="p-10 text-center text-gray-500 text-[.85rem]">
+          No hay ítems en esta cuenta.
+        </div>
+        <div v-for="item in allSplitItems" :key="item.splitKey"
+          @click="toggleSplitItem(item.splitKey)"
+          class="flex items-center px-4 py-3 border-b border-white/[.05] gap-3 cursor-pointer active:bg-white/[.04] select-none">
+          <div :class="[
+            'min-w-[28px] h-7 px-1.5 rounded-[6px] text-[.7rem] font-black flex items-center justify-center flex-shrink-0',
+            (splitAssignment[item.splitKey] ?? 0) === 0 ? 'bg-gold text-dark' :
+            (splitAssignment[item.splitKey] ?? 0) === 1 ? 'bg-[#4C9EC9] text-white' :
+            (splitAssignment[item.splitKey] ?? 0) === 2 ? 'bg-[#4CAD6A] text-white' :
+                                                           'bg-[#C94C6B] text-white'
+          ]">P{{ (splitAssignment[item.splitKey] ?? 0) + 1 }}</div>
+          <div class="text-[.68rem] font-bold rounded-[5px] px-1.5 py-0.5 bg-white/[.07] text-gray-400 flex-shrink-0">×{{ item.qty }}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[.88rem] text-white font-medium truncate">{{ item.nombre }}</div>
+            <div v-if="item.nota" class="text-[.62rem] text-gray-500 italic">📝 {{ item.nota }}</div>
+          </div>
+          <div v-if="item.precio && item.precio !== '$0'" class="font-display text-[.8rem] text-gold whitespace-nowrap flex-shrink-0">{{ item.precio }}</div>
+        </div>
+      </div>
+
+      <!-- Per-person pay buttons -->
+      <div class="fixed bottom-0 left-0 right-0 px-4 pb-[18px] pt-3 bg-gradient-to-t from-dark via-dark/90 to-transparent">
+        <div v-for="(total, idx) in splitTotals" :key="idx" class="mb-2">
+          <div v-if="splitPaid[idx]"
+            :class="[
+              'w-full py-3 rounded-[10px] text-[.88rem] font-bold text-center tracking-[.04em]',
+              idx === 0 ? 'bg-gold/[.08] text-gold/40 border border-gold/15' :
+              idx === 1 ? 'bg-[#4C9EC9]/[.08] text-[#4C9EC9]/50 border border-[#4C9EC9]/15' :
+              idx === 2 ? 'bg-[#4CAD6A]/[.08] text-[#4CAD6A]/50 border border-[#4CAD6A]/15' :
+                          'bg-[#C94C6B]/[.08] text-[#C94C6B]/50 border border-[#C94C6B]/15'
+            ]">✓ Persona {{ idx + 1 }} cobrada</div>
+          <button v-else @click="paySplitPerson(idx)"
+            :disabled="total === 0"
+            :class="[
+              'w-full py-3.5 rounded-[10px] text-[.88rem] font-bold tracking-[.04em] border-none cursor-pointer transition-opacity disabled:opacity-30',
+              idx === 0 ? 'bg-gold text-dark' :
+              idx === 1 ? 'bg-[#4C9EC9] text-white' :
+              idx === 2 ? 'bg-[#4CAD6A] text-white' :
+                          'bg-[#C94C6B] text-white'
+            ]">
+            Cobrar Persona {{ idx + 1 }}<span v-if="total > 0"> — ${{ total.toLocaleString('es-AR') }}</span>
+          </button>
+        </div>
       </div>
     </template>
 
@@ -835,9 +1084,11 @@ async function doLogout() {
       <div v-if="payVisible" class="fixed inset-0 bg-black/75 z-[60] flex items-end" @click.self="payVisible = false">
         <div class="w-full bg-[#1a1a1a] rounded-t-[22px] border-t border-gold/30 pt-2 pb-9 max-h-[92vh] overflow-y-auto">
           <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4"></div>
-          <div class="font-display text-[1rem] font-black text-gold text-center tracking-[.06em] px-5 pb-1">Cerrar mesa</div>
+          <div class="font-display text-[1rem] font-black text-gold text-center tracking-[.06em] px-5 pb-1">
+            {{ splitPayingPerson >= 0 ? `Persona ${splitPayingPerson + 1}` : 'Cerrar mesa' }}
+          </div>
           <div class="text-[.6rem] text-gray-500 text-center tracking-[.12em] pb-3 border-b border-white/[.06]">{{ cart.mesaLabel }}</div>
-          <div class="flex items-center justify-between px-5 py-3 border-b border-white/[.06]">
+          <div v-if="splitPayingPerson < 0" class="flex items-center justify-between px-5 py-3 border-b border-white/[.06]">
             <span class="text-[.6rem] text-gray-500 tracking-[.14em] uppercase">Cubiertos</span>
             <div class="flex items-center gap-4">
               <button @click="cart.setCubiertos(cart.cubiertos - 1)"
@@ -848,9 +1099,13 @@ async function doLogout() {
             </div>
           </div>
           <div class="text-center px-5 py-3.5 pb-2.5">
-            <div class="text-[.6rem] text-gray-500 tracking-[.15em] uppercase">Total de la cuenta</div>
+            <div class="text-[.6rem] text-gray-500 tracking-[.15em] uppercase">
+              {{ splitPayingPerson >= 0 ? 'Monto a cobrar' : 'Total de la cuenta' }}
+            </div>
             <div class="font-display text-[2rem] font-black text-gold leading-tight">
-              {{ cart.grandTotal > 0 ? `$${cart.grandTotal.toLocaleString('es-AR')}` : '—' }}
+              {{ splitPayingPerson >= 0
+                  ? (splitTotals[splitPayingPerson] > 0 ? `$${splitTotals[splitPayingPerson].toLocaleString('es-AR')}` : '—')
+                  : (grandTotalAdjusted > 0 ? `$${grandTotalAdjusted.toLocaleString('es-AR')}` : '—') }}
             </div>
           </div>
           <div class="text-[.58rem] text-gray-500 tracking-[.14em] uppercase px-5 py-2">¿Cómo paga la mesa?</div>
@@ -888,9 +1143,41 @@ async function doLogout() {
             class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
           <input v-model="delRef" placeholder="Referencia: piso, timbre, depto..." autocomplete="off"
             class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          <div class="text-[.55rem] text-gray-500 tracking-[.14em] uppercase px-3.5 mt-3.5 mb-1.5">Método de pago (opcional)</div>
+          <div class="grid grid-cols-3 gap-1.5 px-3.5">
+            <button v-for="m in METODOS" :key="m.id" @click="delMetodo = delMetodo === m.id ? '' : m.id"
+              :class="[
+                'border rounded-xl py-2.5 px-1.5 text-center flex flex-col items-center gap-0.5 transition-colors cursor-pointer',
+                delMetodo === m.id ? 'border-gold bg-gold/[.12]' : 'border-gold/15 bg-white/[.04]',
+              ]">
+              <div class="text-[1.1rem] leading-none">{{ m.icon }}</div>
+              <div :class="['text-[.52rem] font-bold tracking-[.02em] text-center', delMetodo === m.id ? 'text-gold' : 'text-gray-400']">{{ m.label }}</div>
+            </button>
+          </div>
           <button @click="confirmDelivery"
             class="block w-[calc(100%-28px)] mx-3.5 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none">Abrir pedido →</button>
           <button @click="delFormVisible = false"
+            class="block w-[calc(100%-28px)] mx-3.5 mt-2 py-2.5 text-white/30 border border-white/10 rounded-lg text-[.8rem] bg-transparent tracking-[.04em] cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══════════════════════════════════════ LLEVAR FORM ══ -->
+    <Transition name="sheet">
+      <div v-if="llevarFormVisible" class="fixed inset-0 bg-black/72 z-[80] flex items-end" @click.self="llevarFormVisible = false">
+        <div class="w-full bg-dark2 rounded-t-[18px] border-t border-gold/25 pt-2 pb-10">
+          <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mb-3.5"></div>
+          <div class="text-[1.8rem] text-center py-1">🛍️</div>
+          <div class="text-[.6rem] text-gray-500 tracking-[.2em] text-center pb-3.5 border-b border-white/[.06] uppercase">Datos del pedido para llevar</div>
+          <input v-model="llevarNombre" placeholder="Nombre y apellido *" autocomplete="off"
+            class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          <input v-model="llevarTel" placeholder="Teléfono" type="tel" autocomplete="off"
+            class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          <input v-model="llevarDir" placeholder="Dirección / referencia (ej: Oroño y Arijon)" autocomplete="off"
+            class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          <button @click="confirmLlevar"
+            class="block w-[calc(100%-28px)] mx-3.5 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none">Abrir pedido →</button>
+          <button @click="llevarFormVisible = false"
             class="block w-[calc(100%-28px)] mx-3.5 mt-2 py-2.5 text-white/30 border border-white/10 rounded-lg text-[.8rem] bg-transparent tracking-[.04em] cursor-pointer">Cancelar</button>
         </div>
       </div>
