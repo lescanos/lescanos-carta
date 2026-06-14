@@ -204,7 +204,15 @@ function switchTab(tab: Tab) {
   if (tab === 'menu' && !menuLoaded.value) loadMenu()
 }
 
+function onPriceFocus(item: MenuItemEditable, idx: number) {
+  item.precios[idx] = item.precios[idx].replace('$', '')
+}
+
 async function saveItemPrecios(item: MenuItemEditable) {
+  item.precios = item.precios.map(p => {
+    const clean = p.replace(/^\$/, '').trim()
+    return clean ? `$${clean}` : p
+  })
   item.saving = true
   const { error } = await supabase.from('menu_items').update({ precios: item.precios }).eq('id', item.id)
   item.saving = false
@@ -345,6 +353,7 @@ onMounted(async () => {
                   v-for="(_, idx) in item.precios"
                   :key="idx"
                   v-model="item.precios[idx]"
+                  @focus="onPriceFocus(item, idx)"
                   @blur="saveItemPrecios(item)"
                   :disabled="item.saving"
                   class="w-[72px] bg-white/[.06] border border-gold/[.18] text-gold text-[.82rem] font-bold
