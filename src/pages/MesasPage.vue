@@ -490,7 +490,7 @@ async function enterEnvio(sesion: Sesion) {
 
 // ── Para llevar form ──────────────────────────────────
 function openLlevarForm() {
-  llevarNombre.value = llevarTel.value = llevarDir.value = ''
+  llevarNombre.value = llevarTel.value = ''
   llevarFormVisible.value = true
 }
 
