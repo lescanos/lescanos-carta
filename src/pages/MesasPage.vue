@@ -53,7 +53,6 @@ const delMetodo      = ref('')
 const llevarFormVisible = ref(false)
 const llevarNombre      = ref('')
 const llevarTel         = ref('')
-const llevarDir         = ref('')
 
 // Listo notification
 const listoText    = ref('')
@@ -373,8 +372,10 @@ function sendDeliveryWA() {
   const s = cart.currentSession
   const allItems = [...cart.sessionItems, ...cart.cart]
   const lines = allItems.map(i => `${i.qty}× ${i.nombre}${i.nota ? ` _(${i.nota})_` : ''}`).join('\n')
-  const total = cart.grandTotal
-  const msg = `🛵 *ENVÍO — ${hh}:${mm}*\n👤 ${s?.cliente_nombre ?? 'Cliente'}${s?.cliente_telefono ? `\n📞 ${s.cliente_telefono}` : ''}\n📍 ${s?.cliente_direccion ?? ''}${s?.cliente_referencia ? `\n📌 ${s.cliente_referencia}` : ''}\n━━━━━━━━━━━\n${lines || '(sin items aún)'}\n━━━━━━━━━━━\nTotal: $${total.toLocaleString('es-AR')}`
+  const subtotal = cart.grandTotal
+  const totalConEnvio = subtotal + costoEnvio.value
+  const envioLine = costoEnvio.value > 0 ? `\nEnvío: $${costoEnvio.value.toLocaleString('es-AR')}` : ''
+  const msg = `🛵 *ENVÍO — ${hh}:${mm}*\n👤 ${s?.cliente_nombre ?? 'Cliente'}${s?.cliente_telefono ? `\n📞 ${s.cliente_telefono}` : ''}\n📍 ${s?.cliente_direccion ?? ''}${s?.cliente_referencia ? `\n📌 ${s.cliente_referencia}` : ''}\n━━━━━━━━━━━\n${lines || '(sin items aún)'}\n━━━━━━━━━━━${envioLine}\nTotal: $${totalConEnvio.toLocaleString('es-AR')}`
   const url = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`
   const a = document.createElement('a')
   a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'
@@ -391,9 +392,17 @@ const METODOS = [
   { id: 'pedidosya',     label: 'Pedidos Ya',    icon: '🛵' },
 ]
 
-function openPayment() {
+async function openPayment() {
   if (cart.cart.length > 0) {
     if (!confirm('Hay items pendientes de envío. ¿Cerrar la mesa igual?')) return
+  }
+  const sesionId = cart.currentSession?.id
+  if (sesionId) {
+    const { data: pending } = await supabase
+      .from('pedidos').select('id').eq('sesion_id', sesionId).eq('estado', 'pendiente').limit(1)
+    if (pending && pending.length > 0) {
+      if (!confirm('Hay pedidos pendientes en cocina. ¿Cerrar la mesa igual?')) return
+    }
   }
   selectedPay.value = cart.currentSession?.metodo_pago ?? ''
   payVisible.value = true
@@ -498,7 +507,6 @@ async function confirmLlevar() {
         moza_nombre: auth.currentUser?.nombre ?? null,
         cliente_nombre: llevarNombre.value.trim(),
         cliente_telefono: llevarTel.value.trim() || null,
-        cliente_direccion: llevarDir.value.trim() || null,
       })
       .select().single()
     if (error) throw error
@@ -550,6 +558,9 @@ function findLabelForSesion(sesionId: string): string | null {
   const envio = deliverySessions.value.find(s => s.id === sesionId)
   if (envio && (isCajaOrDueno || envio.moza_id === auth.currentUser?.id))
     return envio.cliente_nombre ? `Envío — ${envio.cliente_nombre}` : 'Envío'
+  const llevar = llevarSessions.value.find(s => s.id === sesionId)
+  if (llevar && (isCajaOrDueno || llevar.moza_id === auth.currentUser?.id))
+    return llevar.cliente_nombre ? `Para llevar — ${llevar.cliente_nombre}` : 'Para llevar'
   return null
 }
 
@@ -1172,8 +1183,6 @@ async function doLogout() {
           <input v-model="llevarNombre" placeholder="Nombre y apellido *" autocomplete="off"
             class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
           <input v-model="llevarTel" placeholder="Teléfono" type="tel" autocomplete="off"
-            class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
-          <input v-model="llevarDir" placeholder="Dirección / referencia (ej: Oroño y Arijon)" autocomplete="off"
             class="block w-[calc(100%-28px)] mx-3.5 mt-2.5 bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
           <button @click="confirmLlevar"
             class="block w-[calc(100%-28px)] mx-3.5 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none">Abrir pedido →</button>

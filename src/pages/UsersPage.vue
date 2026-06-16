@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
 
@@ -150,7 +150,9 @@ interface SeccionDisplay {
   id: string
   pagina: number
   pagina_titulo: string
+  pagina_subtitulo: string | null
   pagina_tipo: string
+  seccion_orden: number
   emoji: string | null
   titulo: string
   nota: string | null
@@ -165,7 +167,7 @@ const menuLoaded    = ref(false)
 async function loadMenu() {
   menuLoading.value = true
   const [{ data: secs }, { data: items }] = await Promise.all([
-    supabase.from('menu_secciones').select('id,pagina,pagina_titulo,pagina_tipo,seccion_orden,emoji,titulo,nota,columnas').order('pagina').order('seccion_orden'),
+    supabase.from('menu_secciones').select('id,pagina,pagina_titulo,pagina_subtitulo,pagina_tipo,seccion_orden,emoji,titulo,nota,columnas').order('pagina').order('seccion_orden'),
     supabase.from('menu_items').select('id,seccion_id,item_orden,nombre,descripcion,precios').order('seccion_id').order('item_orden'),
   ])
   if (!secs || !items) { menuLoading.value = false; return }
@@ -180,7 +182,9 @@ async function loadMenu() {
     id: s.id as string,
     pagina: s.pagina as number,
     pagina_titulo: s.pagina_titulo as string,
+    pagina_subtitulo: s.pagina_subtitulo as string | null,
     pagina_tipo: s.pagina_tipo as string,
+    seccion_orden: s.seccion_orden as number,
     emoji: s.emoji as string | null,
     titulo: s.titulo as string,
     nota: s.nota as string | null,
@@ -202,6 +206,123 @@ async function loadMenu() {
 function switchTab(tab: Tab) {
   activeTab.value = tab
   if (tab === 'menu' && !menuLoaded.value) loadMenu()
+}
+
+const menuPagesGrouped = computed(() => {
+  const map = new Map<number, { pagina: number; titulo: string; subtitulo: string | null; secciones: SeccionDisplay[] }>()
+  for (const sec of menuSecciones.value) {
+    if (!map.has(sec.pagina)) map.set(sec.pagina, { pagina: sec.pagina, titulo: sec.pagina_titulo, subtitulo: sec.pagina_subtitulo, secciones: [] })
+    map.get(sec.pagina)!.secciones.push(sec)
+  }
+  return [...map.values()]
+})
+
+// ── Agregar ítem ──────────────────────────────────────────────────────────
+const addItemVisible = ref(false)
+const addItemSec     = ref<SeccionDisplay | null>(null)
+const addItemNombre  = ref('')
+const addItemDesc    = ref('')
+const addItemPrecios = ref<string[]>(['$0'])
+const addItemSaving  = ref(false)
+
+function openAddItem(sec: SeccionDisplay) {
+  addItemSec.value = sec
+  addItemNombre.value = ''
+  addItemDesc.value = ''
+  addItemPrecios.value = sec.columnas ? sec.columnas.map(() => '$0') : ['$0']
+  addItemVisible.value = true
+}
+
+async function saveNewItem() {
+  const sec = addItemSec.value
+  if (!sec || !addItemNombre.value.trim()) { showToast('El nombre es requerido'); return }
+  addItemSaving.value = true
+  const { error } = await supabase.from('menu_items').insert({
+    seccion_id: sec.id,
+    item_orden: sec.items.length,
+    nombre: addItemNombre.value.trim(),
+    descripcion: addItemDesc.value.trim() || null,
+    precios: addItemPrecios.value.map(p => p.trim() || '$0'),
+  })
+  addItemSaving.value = false
+  if (error) { showToast('Error al guardar'); return }
+  menuLoaded.value = false
+  await loadMenu()
+  addItemVisible.value = false
+  showToast('Ítem agregado ✓')
+}
+
+// ── Agregar sección ───────────────────────────────────────────────────────
+const addSecVisible       = ref(false)
+const addSecPagina        = ref(0)
+const addSecPageTitulo    = ref('')
+const addSecPageSubtitulo = ref<string | null>(null)
+const addSecEmoji         = ref('')
+const addSecTitulo        = ref('')
+const addSecNota          = ref('')
+const addSecColumnas      = ref('')
+const addSecSaving        = ref(false)
+
+function openAddSection(pagina: number, paginaTitulo: string, paginaSubtitulo: string | null) {
+  addSecPagina.value = pagina
+  addSecPageTitulo.value = paginaTitulo
+  addSecPageSubtitulo.value = paginaSubtitulo
+  addSecEmoji.value = ''
+  addSecTitulo.value = ''
+  addSecNota.value = ''
+  addSecColumnas.value = ''
+  addSecVisible.value = true
+}
+
+async function saveNewSection() {
+  if (!addSecTitulo.value.trim()) { showToast('El título es requerido'); return }
+  const sibs = menuSecciones.value.filter(s => s.pagina === addSecPagina.value)
+  const nextOrder = sibs.length > 0 ? Math.max(...sibs.map(s => s.seccion_orden)) + 1 : 0
+  const columnas = addSecColumnas.value.trim() ? addSecColumnas.value.split(',').map(s => s.trim()).filter(Boolean) : null
+  addSecSaving.value = true
+  const { error } = await supabase.from('menu_secciones').insert({
+    pagina: addSecPagina.value, pagina_titulo: addSecPageTitulo.value,
+    pagina_subtitulo: addSecPageSubtitulo.value, pagina_tipo: '',
+    seccion_orden: nextOrder, emoji: addSecEmoji.value.trim() || null,
+    titulo: addSecTitulo.value.trim(), nota: addSecNota.value.trim() || null, columnas,
+  })
+  addSecSaving.value = false
+  if (error) { showToast('Error al guardar'); return }
+  menuLoaded.value = false; await loadMenu()
+  addSecVisible.value = false; showToast('Sección agregada ✓')
+}
+
+// ── Agregar página ────────────────────────────────────────────────────────
+const addPageVisible   = ref(false)
+const addPageTitulo    = ref('')
+const addPageSubtitulo = ref('')
+const addPageEmoji     = ref('')
+const addPageSecTitulo = ref('')
+const addPageNota      = ref('')
+const addPageColumnas  = ref('')
+const addPageSaving    = ref(false)
+
+function openAddPage() {
+  addPageTitulo.value = ''; addPageSubtitulo.value = ''; addPageEmoji.value = ''
+  addPageSecTitulo.value = ''; addPageNota.value = ''; addPageColumnas.value = ''
+  addPageVisible.value = true
+}
+
+async function saveNewPage() {
+  if (!addPageTitulo.value.trim() || !addPageSecTitulo.value.trim()) { showToast('Título de página y primera sección son requeridos'); return }
+  const maxPagina = menuSecciones.value.length > 0 ? Math.max(...menuSecciones.value.map(s => s.pagina)) : 0
+  const columnas = addPageColumnas.value.trim() ? addPageColumnas.value.split(',').map(s => s.trim()).filter(Boolean) : null
+  addPageSaving.value = true
+  const { error } = await supabase.from('menu_secciones').insert({
+    pagina: maxPagina + 1, pagina_titulo: addPageTitulo.value.trim(),
+    pagina_subtitulo: addPageSubtitulo.value.trim() || null, pagina_tipo: '',
+    seccion_orden: 0, emoji: addPageEmoji.value.trim() || null,
+    titulo: addPageSecTitulo.value.trim(), nota: addPageNota.value.trim() || null, columnas,
+  })
+  addPageSaving.value = false
+  if (error) { showToast('Error al guardar'); return }
+  menuLoaded.value = false; await loadMenu()
+  addPageVisible.value = false; showToast('Página creada ✓')
 }
 
 function onPriceFocus(item: MenuItemEditable, idx: number) {
@@ -315,55 +436,74 @@ onMounted(async () => {
             Tocá un precio para editarlo — se guarda automáticamente al salir del campo
           </div>
 
-          <template v-for="sec in menuSecciones" :key="sec.id">
-            <!-- Separador de página -->
+          <template v-for="page in menuPagesGrouped" :key="page.pagina">
+            <!-- Separador de página (una sola vez por página) -->
             <div class="px-4 pt-4 pb-1 flex items-center gap-2">
-              <div class="text-[.58rem] text-gold/40 tracking-[.16em] uppercase">{{ sec.pagina_titulo }}</div>
+              <div class="text-[.58rem] text-gold/40 tracking-[.16em] uppercase">{{ page.titulo }}</div>
               <div class="flex-1 h-px bg-gold/10"></div>
             </div>
 
-            <!-- Header de sección -->
-            <div class="px-4 py-2 bg-dark2/50 border-y border-white/[.04] flex items-center gap-2">
-              <span class="text-base">{{ sec.emoji }}</span>
-              <div>
-                <span class="text-[.8rem] font-bold text-gold tracking-[.05em]">{{ sec.titulo || sec.pagina_titulo }}</span>
-                <span v-if="sec.nota" class="text-[.65rem] text-gray-500 ml-2">{{ sec.nota }}</span>
+            <template v-for="sec in page.secciones" :key="sec.id">
+              <!-- Header de sección -->
+              <div class="px-4 py-2 bg-dark2/50 border-y border-white/[.04] flex items-center gap-2">
+                <span class="text-base">{{ sec.emoji }}</span>
+                <div>
+                  <span class="text-[.8rem] font-bold text-gold tracking-[.05em]">{{ sec.titulo || sec.pagina_titulo }}</span>
+                  <span v-if="sec.nota" class="text-[.65rem] text-gray-500 ml-2">{{ sec.nota }}</span>
+                </div>
               </div>
-            </div>
 
-            <!-- Encabezado de columnas -->
-            <div v-if="sec.columnas" class="flex items-center px-4 py-1 border-b border-white/[.04]">
-              <div class="flex-1 text-[.58rem] text-gray-600 uppercase tracking-widest">Producto</div>
-              <div v-for="col in sec.columnas" :key="col"
-                class="w-[72px] text-center text-[.58rem] text-gray-600 uppercase tracking-widest">
-                {{ col }}
+              <!-- Encabezado de columnas -->
+              <div v-if="sec.columnas" class="flex items-center px-4 py-1 border-b border-white/[.04]">
+                <div class="flex-1 text-[.58rem] text-gray-600 uppercase tracking-widest">Producto</div>
+                <div v-for="col in sec.columnas" :key="col"
+                  class="w-[72px] text-center text-[.58rem] text-gray-600 uppercase tracking-widest">
+                  {{ col }}
+                </div>
               </div>
-            </div>
 
-            <!-- Items -->
-            <div v-for="item in sec.items" :key="item.id"
-              class="flex items-center px-4 py-2.5 border-b border-white/[.04] gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="text-[.82rem] font-bold text-white truncate">{{ item.nombre }}</div>
-                <div v-if="item.descripcion" class="text-[.62rem] text-gray-500 truncate mt-0.5">{{ item.descripcion }}</div>
+              <!-- Items -->
+              <div v-for="item in sec.items" :key="item.id"
+                class="flex items-center px-4 py-2.5 border-b border-white/[.04] gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[.82rem] font-bold text-white truncate">{{ item.nombre }}</div>
+                  <div v-if="item.descripcion" class="text-[.62rem] text-gray-500 truncate mt-0.5">{{ item.descripcion }}</div>
+                </div>
+                <div class="flex gap-1.5 flex-shrink-0 items-center">
+                  <input
+                    v-for="(_, idx) in item.precios"
+                    :key="idx"
+                    v-model="item.precios[idx]"
+                    @focus="onPriceFocus(item, idx)"
+                    @blur="saveItemPrecios(item)"
+                    :disabled="item.saving"
+                    class="w-[72px] bg-white/[.06] border border-gold/[.18] text-gold text-[.82rem] font-bold
+                           px-2 py-1.5 rounded-lg text-center focus:outline-none focus:border-gold/60
+                           disabled:opacity-40 font-mono"
+                  />
+                  <span v-if="item.saving" class="text-[.65rem] text-gray-500 w-3">…</span>
+                </div>
               </div>
-              <!-- Inputs de precio (uno por columna) -->
-              <div class="flex gap-1.5 flex-shrink-0 items-center">
-                <input
-                  v-for="(_, idx) in item.precios"
-                  :key="idx"
-                  v-model="item.precios[idx]"
-                  @focus="onPriceFocus(item, idx)"
-                  @blur="saveItemPrecios(item)"
-                  :disabled="item.saving"
-                  class="w-[72px] bg-white/[.06] border border-gold/[.18] text-gold text-[.82rem] font-bold
-                         px-2 py-1.5 rounded-lg text-center focus:outline-none focus:border-gold/60
-                         disabled:opacity-40 font-mono"
-                />
-                <span v-if="item.saving" class="text-[.65rem] text-gray-500 w-3">…</span>
-              </div>
-            </div>
+
+              <!-- Botón agregar ítem -->
+              <button @click="openAddItem(sec)"
+                class="flex items-center gap-1.5 w-full px-4 py-2 text-[.72rem] text-gold/50 border-none bg-transparent cursor-pointer hover:text-gold/80 transition-colors border-b border-white/[.03]">
+                <span class="text-base leading-none">＋</span> Nuevo ítem en {{ sec.titulo || sec.pagina_titulo }}
+              </button>
+            </template>
+
+            <!-- Botón agregar sección a esta página -->
+            <button @click="openAddSection(page.pagina, page.titulo, page.subtitulo)"
+              class="flex items-center gap-1.5 w-full px-4 py-2.5 text-[.72rem] text-gold/40 border-none bg-transparent cursor-pointer hover:text-gold/70 transition-colors border-b border-white/[.04]">
+              <span class="text-base leading-none">＋</span> Nueva sección en {{ page.titulo }}
+            </button>
           </template>
+
+          <!-- Botón nueva página -->
+          <button @click="openAddPage"
+            class="flex items-center justify-center gap-2 w-full px-4 py-4 text-[.78rem] font-bold text-gold/60 border-none bg-transparent cursor-pointer hover:text-gold transition-colors">
+            ＋ Nueva página de menú
+          </button>
 
           <div class="h-6"></div>
         </div>
@@ -479,6 +619,95 @@ onMounted(async () => {
             {{ newSaving ? 'Creando...' : 'Crear usuario' }}
           </button>
           <button @click="newVisible = false"
+            class="block w-[calc(100%-32px)] mx-4 mt-2 py-2.5 text-white/35 border border-white/10 rounded-lg text-[.82rem] bg-transparent cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══ AGREGAR ÍTEM MODAL ══ -->
+    <Transition name="sheet">
+      <div v-if="addItemVisible" class="fixed inset-0 bg-black/72 z-50 flex items-end" @click.self="addItemVisible = false">
+        <div class="w-full bg-[#1a1a1a] rounded-t-[22px] border-t border-gold/30 pt-2 pb-10 max-h-[92vh] overflow-y-auto">
+          <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4"></div>
+          <div class="font-display text-[1rem] font-black text-gold text-center tracking-[.06em] pb-1">Nuevo ítem</div>
+          <div class="text-[.65rem] text-gray-500 text-center pb-3 border-b border-white/[.06]">{{ addItemSec?.titulo || addItemSec?.pagina_titulo }}</div>
+          <div class="px-4 pt-3 space-y-2.5">
+            <input v-model="addItemNombre" placeholder="Nombre del ítem *"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addItemDesc" placeholder="Descripción (ingredientes, etc.)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <div class="flex gap-2">
+              <div v-for="(_, idx) in addItemPrecios" :key="idx" class="flex-1">
+                <div class="text-[.6rem] text-gray-500 mb-1 text-center">{{ addItemSec?.columnas?.[idx] ?? 'Precio' }}</div>
+                <input v-model="addItemPrecios[idx]" placeholder="$0"
+                  class="block w-full bg-white/[.06] border border-gold/[.18] text-gold text-[.9rem] font-bold px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50 text-center font-mono" />
+              </div>
+            </div>
+          </div>
+          <button @click="saveNewItem" :disabled="addItemSaving"
+            class="block w-[calc(100%-32px)] mx-4 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none disabled:opacity-45">
+            {{ addItemSaving ? 'Guardando...' : 'Agregar ítem' }}
+          </button>
+          <button @click="addItemVisible = false"
+            class="block w-[calc(100%-32px)] mx-4 mt-2 py-2.5 text-white/35 border border-white/10 rounded-lg text-[.82rem] bg-transparent cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══ AGREGAR SECCIÓN MODAL ══ -->
+    <Transition name="sheet">
+      <div v-if="addSecVisible" class="fixed inset-0 bg-black/72 z-50 flex items-end" @click.self="addSecVisible = false">
+        <div class="w-full bg-[#1a1a1a] rounded-t-[22px] border-t border-gold/30 pt-2 pb-10 max-h-[92vh] overflow-y-auto">
+          <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4"></div>
+          <div class="font-display text-[1rem] font-black text-gold text-center tracking-[.06em] pb-1">Nueva sección</div>
+          <div class="text-[.65rem] text-gray-500 text-center pb-3 border-b border-white/[.06]">en {{ addSecPageTitulo }}</div>
+          <div class="px-4 pt-3 space-y-2.5">
+            <input v-model="addSecEmoji" placeholder="Emoji (ej: 🍔)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addSecTitulo" placeholder="Título de la sección *"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addSecNota" placeholder="Nota (ej: Con papas y gaseosa)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addSecColumnas" placeholder="Columnas de precio: dejar vacío para precio único, o ej: Solo,Con papas"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          </div>
+          <button @click="saveNewSection" :disabled="addSecSaving"
+            class="block w-[calc(100%-32px)] mx-4 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none disabled:opacity-45">
+            {{ addSecSaving ? 'Guardando...' : 'Agregar sección' }}
+          </button>
+          <button @click="addSecVisible = false"
+            class="block w-[calc(100%-32px)] mx-4 mt-2 py-2.5 text-white/35 border border-white/10 rounded-lg text-[.82rem] bg-transparent cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ══ AGREGAR PÁGINA MODAL ══ -->
+    <Transition name="sheet">
+      <div v-if="addPageVisible" class="fixed inset-0 bg-black/72 z-50 flex items-end" @click.self="addPageVisible = false">
+        <div class="w-full bg-[#1a1a1a] rounded-t-[22px] border-t border-gold/30 pt-2 pb-10 max-h-[92vh] overflow-y-auto">
+          <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4"></div>
+          <div class="font-display text-[1rem] font-black text-gold text-center tracking-[.06em] pb-3 border-b border-white/[.06]">Nueva página de menú</div>
+          <div class="px-4 pt-3 space-y-2.5">
+            <div class="text-[.6rem] text-gray-500 tracking-[.1em] uppercase px-1">Página</div>
+            <input v-model="addPageTitulo" placeholder="Título de la página * (ej: Pastas)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addPageSubtitulo" placeholder="Subtítulo (ej: Caseras, al dente)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <div class="text-[.6rem] text-gray-500 tracking-[.1em] uppercase px-1 pt-1">Primera sección</div>
+            <input v-model="addPageEmoji" placeholder="Emoji (ej: 🍝)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addPageSecTitulo" placeholder="Título de la primera sección * (ej: FIDEOS)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addPageNota" placeholder="Nota (ej: Con salsa a elección)"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <input v-model="addPageColumnas" placeholder="Columnas de precio: vacío para precio único, o ej: Chico,Grande"
+              class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+          </div>
+          <button @click="saveNewPage" :disabled="addPageSaving"
+            class="block w-[calc(100%-32px)] mx-4 mt-4 py-3.5 bg-gold text-dark font-bold text-[.9rem] rounded-[10px] tracking-[.04em] cursor-pointer border-none disabled:opacity-45">
+            {{ addPageSaving ? 'Guardando...' : 'Crear página' }}
+          </button>
+          <button @click="addPageVisible = false"
             class="block w-[calc(100%-32px)] mx-4 mt-2 py-2.5 text-white/35 border border-white/10 rounded-lg text-[.82rem] bg-transparent cursor-pointer">Cancelar</button>
         </div>
       </div>
