@@ -300,21 +300,36 @@ const addPageEmoji     = ref('')
 const addPageSecTitulo = ref('')
 const addPageNota      = ref('')
 const addPageColumnas  = ref('')
+const addPagePosition  = ref<number | 'end'>('end')
 const addPageSaving    = ref(false)
 
 function openAddPage() {
   addPageTitulo.value = ''; addPageSubtitulo.value = ''; addPageEmoji.value = ''
   addPageSecTitulo.value = ''; addPageNota.value = ''; addPageColumnas.value = ''
+  addPagePosition.value = 'end'
   addPageVisible.value = true
 }
 
 async function saveNewPage() {
   if (!addPageTitulo.value.trim() || !addPageSecTitulo.value.trim()) { showToast('Título de página y primera sección son requeridos'); return }
-  const maxPagina = menuSecciones.value.length > 0 ? Math.max(...menuSecciones.value.map(s => s.pagina)) : 0
   const columnas = addPageColumnas.value.trim() ? addPageColumnas.value.split(',').map(s => s.trim()).filter(Boolean) : null
   addPageSaving.value = true
+
+  const maxPagina = Math.max(0, ...menuSecciones.value.map(s => s.pagina))
+  const insertAfter = addPagePosition.value === 'end' ? maxPagina : addPagePosition.value as number
+  const newPagina = insertAfter + 1
+
+  // Si no es al final, desplazar las páginas que quedan después
+  if (addPagePosition.value !== 'end') {
+    const toRenumber = [...new Set(menuSecciones.value.filter(s => s.pagina > insertAfter).map(s => s.pagina))].sort((a, b) => b - a)
+    for (const p of toRenumber) {
+      const { error } = await supabase.from('menu_secciones').update({ pagina: p + 1 }).eq('pagina', p)
+      if (error) { addPageSaving.value = false; showToast('Error al reordenar'); return }
+    }
+  }
+
   const { error } = await supabase.from('menu_secciones').insert({
-    pagina: maxPagina + 1, pagina_titulo: addPageTitulo.value.trim(),
+    pagina: newPagina, pagina_titulo: addPageTitulo.value.trim(),
     pagina_subtitulo: addPageSubtitulo.value.trim() || null, pagina_tipo: '',
     seccion_orden: 0, emoji: addPageEmoji.value.trim() || null,
     titulo: addPageSecTitulo.value.trim(), nota: addPageNota.value.trim() || null, columnas,
@@ -693,6 +708,14 @@ onMounted(async () => {
               class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
             <input v-model="addPageSubtitulo" placeholder="Subtítulo (ej: Caseras, al dente)"
               class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
+            <div>
+              <div class="text-[.6rem] text-gray-500 tracking-[.1em] uppercase px-1 mb-1">Posición</div>
+              <select v-model="addPagePosition"
+                class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50">
+                <option v-for="page in menuPagesGrouped" :key="page.pagina" :value="page.pagina">Después de {{ page.titulo }}</option>
+                <option value="end">Al final</option>
+              </select>
+            </div>
             <div class="text-[.6rem] text-gray-500 tracking-[.1em] uppercase px-1 pt-1">Primera sección</div>
             <input v-model="addPageEmoji" placeholder="Emoji (ej: 🍝)"
               class="block w-full bg-white/[.06] border border-gold/[.18] text-white text-[.9rem] px-3 py-2.5 rounded-[10px] focus:outline-none focus:border-gold/50" />
