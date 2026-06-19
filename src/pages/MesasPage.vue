@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useCartStore } from '@/stores/cart.store'
 import { timeBsAs } from '@/utils/timezone'
 import type { Sesion, MenuPagina, PedidoItem } from '@/types/domain'
+import { nextEntregadoQty, entregadoStatus } from '@/utils/entrega'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -597,8 +598,8 @@ function showListoNotif(label: string) {
 }
 
 // ── Entrega ítem por ítem ─────────────────────────────
-async function marcarEntregado(item: import('@/types/domain').PedidoItem) {
-  const newQty = item.entregado_qty >= item.qty ? 0 : item.entregado_qty + 1
+async function marcarEntregado(item: PedidoItem) {
+  const newQty = nextEntregadoQty(item.entregado_qty, item.qty)
   const { error } = await supabase.from('pedido_items').update({ entregado_qty: newQty }).eq('id', item.id)
   if (!error) item.entregado_qty = newQty
 }
@@ -944,13 +945,11 @@ async function doLogout() {
                 @click.stop="marcarEntregado(item)"
                 :class="[
                   'flex-shrink-0 min-w-[44px] text-center text-[.72rem] font-bold px-2 py-1.5 rounded-lg border cursor-pointer transition-colors',
-                  item.entregado_qty === 0
-                    ? 'border-white/15 text-white/30 bg-transparent'
-                    : item.entregado_qty >= item.qty
-                      ? 'border-green-500/50 text-green-400 bg-green-500/[.1]'
-                      : 'border-gold/50 text-gold bg-gold/[.08]'
+                  entregadoStatus(item.entregado_qty, item.qty) === 'none'    ? 'border-white/15 text-white/30 bg-transparent' :
+                  entregadoStatus(item.entregado_qty, item.qty) === 'full'    ? 'border-green-500/50 text-green-400 bg-green-500/[.1]' :
+                                                                                'border-gold/50 text-gold bg-gold/[.08]'
                 ]">
-                {{ item.entregado_qty >= item.qty ? '✓' : `${item.entregado_qty}/${item.qty}` }}
+                {{ entregadoStatus(item.entregado_qty, item.qty) === 'full' ? '✓' : `${item.entregado_qty}/${item.qty}` }}
               </button>
 
               <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
