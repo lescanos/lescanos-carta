@@ -40,7 +40,7 @@ export interface Sesion {
 
 // ── PEDIDOS ────────────────────────────────────────────────────────────────
 export type EstadoPedido = 'pendiente' | 'listo'
-export type TipoPedido = 'pedido' | 'cambio' | 'cancelacion'
+export type TipoPedido = 'pedido' | 'cambio' | 'cancelacion' | 'barra'
 
 export interface Pedido {
   id: string
@@ -102,6 +102,7 @@ export interface CartItem {
   nota?: string
   pagina?: string
   seccion?: string
+  va_a_cocina?: boolean
 }
 
 // ── MENÚ (filas de la base de datos) ──────────────────────────────────────
@@ -116,6 +117,7 @@ export interface MenuSeccionRow {
   titulo: string
   nota: string | null
   columnas: string[] | null
+  va_a_cocina: boolean
 }
 
 export interface MenuItemRow {
@@ -140,6 +142,7 @@ export interface MenuSeccion {
   titulo: string
   nota?: string
   columnas?: string[]
+  va_a_cocina?: boolean
   items: MenuItem[]
 }
 

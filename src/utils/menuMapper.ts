@@ -68,6 +68,7 @@ export function dbRowsToMenuPaginas(
             titulo: sec.titulo,
             nota: sec.nota ?? undefined,
             columnas: sec.columnas ?? undefined,
+            va_a_cocina: sec.va_a_cocina,
             items: secItems,
           }
         })

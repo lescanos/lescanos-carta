@@ -13,6 +13,7 @@ const baseSec = (overrides: Partial<MenuSeccionRow> = {}): MenuSeccionRow => ({
   titulo: 'HAMBURGUESAS',
   nota: 'Con papas',
   columnas: ['Solo', 'Con papas'],
+  va_a_cocina: true,
   ...overrides,
 })
 
@@ -115,5 +116,16 @@ describe('dbRowsToMenuPaginas', () => {
   it('no propaga desc si es null', () => {
     const result = dbRowsToMenuPaginas([baseSec()], [baseItem({ descripcion: null })])
     expect(result[0].secciones![0].items[0].desc).toBeUndefined()
+  })
+
+  it('propaga va_a_cocina=false para secciones de bebidas', () => {
+    const bebidas = baseSec({ titulo: 'CERVEZAS', columnas: null, va_a_cocina: false })
+    const result = dbRowsToMenuPaginas([bebidas], [baseItem({ precios: ['$5.000'] })])
+    expect(result[0].secciones![0].va_a_cocina).toBe(false)
+  })
+
+  it('propaga va_a_cocina=true por defecto para secciones de comida', () => {
+    const result = dbRowsToMenuPaginas([baseSec()], [])
+    expect(result[0].secciones![0].va_a_cocina).toBe(true)
   })
 })

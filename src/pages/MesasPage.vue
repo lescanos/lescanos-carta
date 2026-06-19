@@ -25,7 +25,7 @@ const llevarSessions   = ref<Sesion[]>([])
 // ── Menu state ────────────────────────────────────────
 type ItemMeta = {
   nombre: string; desc?: string; precio?: string; precios?: string[]
-  pagina: string; seccion: string; _columnas?: string[]
+  pagina: string; seccion: string; _columnas?: string[]; va_a_cocina?: boolean
 }
 const menuPages = ref<MenuPagina[]>([])
 const pageIdx   = ref(0)
@@ -194,9 +194,9 @@ function buildItemsMap() {
         sec.items.forEach((item, ii) => {
           const baseId = `p${pi}s${si}i${ii}`
           if (sec.columnas) {
-            itemsMap.value[baseId] = { nombre: item.nombre, desc: item.desc, pagina: page.titulo, seccion: sec.titulo, _columnas: sec.columnas, precios: item.precios }
+            itemsMap.value[baseId] = { nombre: item.nombre, desc: item.desc, pagina: page.titulo, seccion: sec.titulo, _columnas: sec.columnas, precios: item.precios, va_a_cocina: sec.va_a_cocina }
           } else {
-            itemsMap.value[baseId] = { nombre: item.nombre, desc: item.desc, pagina: page.titulo, seccion: sec.titulo, precio: item.precio ?? (item.precios?.[0] ?? '$0') }
+            itemsMap.value[baseId] = { nombre: item.nombre, desc: item.desc, pagina: page.titulo, seccion: sec.titulo, precio: item.precio ?? (item.precios?.[0] ?? '$0'), va_a_cocina: sec.va_a_cocina }
           }
         })
       })
@@ -262,7 +262,7 @@ function variantTotalQty(baseId: string): number {
 function addSimple(id: string) {
   const meta = itemsMap.value[id]
   if (!meta) return
-  cart.addItem({ id, nombre: meta.nombre, precio: meta.precio ?? '$0', qty: 1, pagina: meta.pagina, seccion: meta.seccion })
+  cart.addItem({ id, nombre: meta.nombre, precio: meta.precio ?? '$0', qty: 1, pagina: meta.pagina, seccion: meta.seccion, va_a_cocina: meta.va_a_cocina })
 }
 
 function removeSimple(id: string) {
@@ -284,7 +284,7 @@ function addVariant(colIdx: number) {
   const meta = itemsMap.value[baseId]
   if (!meta?._columnas) return
   const id = `${baseId}-c${colIdx}`
-  cart.addItem({ id, nombre: `${meta.nombre} (${meta._columnas[colIdx]})`, precio: meta.precios?.[colIdx] ?? '$0', qty: 1, pagina: meta.pagina, seccion: meta.seccion })
+  cart.addItem({ id, nombre: `${meta.nombre} (${meta._columnas[colIdx]})`, precio: meta.precios?.[colIdx] ?? '$0', qty: 1, pagina: meta.pagina, seccion: meta.seccion, va_a_cocina: meta.va_a_cocina })
 }
 
 function removeVariant(colIdx: number) {

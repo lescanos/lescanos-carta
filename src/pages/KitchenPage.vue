@@ -120,11 +120,13 @@ async function loadOrders() {
         .from('pedidos')
         .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')
         .eq('estado', 'pendiente')
+        .neq('tipo', 'barra')
         .order('created_at', { ascending: true }),
       supabase
         .from('pedidos')
         .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')
         .eq('estado', 'listo')
+        .neq('tipo', 'barra')
         .gte('listo_at', listoDesde)
         .order('listo_at', { ascending: false })
         .limit(15),
@@ -176,6 +178,7 @@ function setupRealtime() {
   kitchenChannel = supabase
     .channel('kitchen-orders')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, async payload => {
+      if (payload.new.tipo === 'barra') return
       const { data } = await supabase
         .from('pedidos')
         .select('*, sesiones(mesa,tipo,cliente_nombre,cliente_direccion), pedido_items(*)')

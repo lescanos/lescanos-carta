@@ -149,27 +149,34 @@ export const useCartStore = defineStore('cart', () => {
 
   async function saveOrder(): Promise<boolean> {
     if (!currentSession.value || cart.value.length === 0) return false
-    const { data: pedido, error: pErr } = await supabase
-      .from('pedidos')
-      .insert({ sesion_id: currentSession.value.id })
-      .select()
-      .single()
-    if (pErr) throw pErr
 
-    const items = cart.value.map(c => ({
-      pedido_id: pedido.id,
-      sesion_id: currentSession.value!.id,
-      nombre: c.nombre,
-      precio: c.precio,
-      qty: c.qty,
-      nota: c.nota ?? null,
-      pagina: c.pagina ?? '',
-      seccion: c.seccion ?? '',
-    }))
+    const cocinaItems = cart.value.filter(c => c.va_a_cocina !== false)
+    const barraItems  = cart.value.filter(c => c.va_a_cocina === false)
 
-    const { error: iErr } = await supabase.from('pedido_items').insert(items)
-    if (iErr) throw iErr
+    async function insertPedido(tipo: 'pedido' | 'barra', items: typeof cart.value) {
+      if (items.length === 0) return
+      const { data: pedido, error: pErr } = await supabase
+        .from('pedidos')
+        .insert({ sesion_id: currentSession.value!.id, tipo })
+        .select()
+        .single()
+      if (pErr) throw pErr
+      const rows = items.map(c => ({
+        pedido_id: pedido.id,
+        sesion_id: currentSession.value!.id,
+        nombre: c.nombre,
+        precio: c.precio,
+        qty: c.qty,
+        nota: c.nota ?? null,
+        pagina: c.pagina ?? '',
+        seccion: c.seccion ?? '',
+      }))
+      const { error: iErr } = await supabase.from('pedido_items').insert(rows)
+      if (iErr) throw iErr
+    }
 
+    await insertPedido('pedido', cocinaItems)
+    await insertPedido('barra', barraItems)
     await loadSessionItems()
     return true
   }
