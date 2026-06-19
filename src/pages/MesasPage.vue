@@ -73,6 +73,7 @@ const splitPayingPerson = ref(-1)
 // Realtime
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null
 let listoChannel:    ReturnType<typeof supabase.channel> | null = null
+let entregaChannel:  ReturnType<typeof supabase.channel> | null = null
 
 const WA_NUMBER = import.meta.env.VITE_WA_NUMBER ?? ''
 
@@ -162,7 +163,10 @@ async function enterMesa(key: string) {
   buildItemsMap()
   showFallback.value = false
   view.value = 'menu'
-  try { await cart.openOrLoadSession(key) }
+  try {
+    await cart.openOrLoadSession(key)
+    if (cart.currentSession?.id) setupEntregaRealtime(cart.currentSession.id)
+  }
   catch { showToast('Sin conexión — modo local') }
   loading.value = false
 }
@@ -210,6 +214,13 @@ const cancelledNames = computed(() =>
 // sessionItems visibles: sin CANCELACION ni CAMBIO
 const sessionItemsDisplay = computed(() =>
   cart.sessionItems.filter(i => i.seccion !== 'CANCELACION' && i.seccion !== 'CAMBIO')
+)
+
+const todoEntregado = computed(() =>
+  sessionItemsDisplay.value.length > 0 &&
+  sessionItemsDisplay.value
+    .filter(i => !cancelledNames.value.has(i.nombre))
+    .every(i => i.entregado_qty >= i.qty)
 )
 
 // Total ajustado: sin ítems cancelados ni CAMBIO/CANCELACION
@@ -585,6 +596,25 @@ function showListoNotif(label: string) {
   listoTimer = setTimeout(() => { listoVisible.value = false }, 9000)
 }
 
+// ── Entrega ítem por ítem ─────────────────────────────
+async function marcarEntregado(item: import('@/types/domain').PedidoItem) {
+  const newQty = item.entregado_qty >= item.qty ? 0 : item.entregado_qty + 1
+  const { error } = await supabase.from('pedido_items').update({ entregado_qty: newQty }).eq('id', item.id)
+  if (!error) item.entregado_qty = newQty
+}
+
+function setupEntregaRealtime(sesionId: string) {
+  entregaChannel?.unsubscribe()
+  entregaChannel = supabase
+    .channel(`entrega-${sesionId}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedido_items', filter: `sesion_id=eq.${sesionId}` }, payload => {
+      const updated = payload.new as import('@/types/domain').PedidoItem
+      const item = cart.sessionItems.find(i => i.id === updated.id)
+      if (item) item.entregado_qty = updated.entregado_qty
+    })
+    .subscribe()
+}
+
 // ── Realtime sesiones grid ────────────────────────────
 function setupRealtimeSesiones() {
   realtimeChannel = supabase
@@ -616,6 +646,7 @@ onMounted(async () => {
 onUnmounted(() => {
   realtimeChannel?.unsubscribe()
   listoChannel?.unsubscribe()
+  entregaChannel?.unsubscribe()
   if (listoTimer) clearTimeout(listoTimer)
   if (toastTimer) clearTimeout(toastTimer)
 })
@@ -885,12 +916,20 @@ async function doLogout() {
           <div v-if="sessionItemsDisplay.length > 0">
             <div v-if="cart.cart.length > 0"
               class="px-4 pt-2.5 pb-1 text-[.55rem] text-gray-500 tracking-[.18em] uppercase">Ya enviado</div>
+
+            <!-- Banner todo entregado -->
+            <div v-if="todoEntregado"
+              class="mx-4 my-2 px-3 py-2 rounded-[10px] bg-green-500/[.12] border border-green-500/30 flex items-center gap-2">
+              <span class="text-green-400 text-base">✓</span>
+              <span class="text-[.78rem] text-green-400 font-bold">Todo entregado a la mesa</span>
+            </div>
+
             <div v-for="(item, idx) in sessionItemsDisplay" :key="idx"
-              :class="['flex items-center px-4 py-3.5 border-b border-white/[.05] gap-3',
-                cancelledNames.has(item.nombre) ? 'opacity-35' : 'opacity-45']">
+              :class="['flex items-center px-4 py-3 border-b border-white/[.05] gap-3',
+                cancelledNames.has(item.nombre) ? 'opacity-35' : '']">
               <div class="bg-gold/40 text-black/50 text-[.75rem] font-bold rounded-[6px] px-2 py-0.5 flex-shrink-0">×{{ item.qty }}</div>
               <div class="flex-1 min-w-0">
-                <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white']">
+                <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white/80']">
                   {{ item.nombre }}
                 </div>
                 <div v-if="cancelledNames.has(item.nombre)"
@@ -899,6 +938,21 @@ async function doLogout() {
               </div>
               <div v-if="item.precio && item.precio !== '$0' && !cancelledNames.has(item.nombre)"
                 class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
+
+              <!-- Botón de entrega -->
+              <button v-if="!cancelledNames.has(item.nombre)"
+                @click.stop="marcarEntregado(item)"
+                :class="[
+                  'flex-shrink-0 min-w-[44px] text-center text-[.72rem] font-bold px-2 py-1.5 rounded-lg border cursor-pointer transition-colors',
+                  item.entregado_qty === 0
+                    ? 'border-white/15 text-white/30 bg-transparent'
+                    : item.entregado_qty >= item.qty
+                      ? 'border-green-500/50 text-green-400 bg-green-500/[.1]'
+                      : 'border-gold/50 text-gold bg-gold/[.08]'
+                ]">
+                {{ item.entregado_qty >= item.qty ? '✓' : `${item.entregado_qty}/${item.qty}` }}
+              </button>
+
               <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
                 <button @click.stop="openCambio(item)"
                   class="border border-[#E89500]/50 text-[#E89500] text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">

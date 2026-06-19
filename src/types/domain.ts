@@ -64,6 +64,7 @@ export interface PedidoItem {
   nota: string | null
   seccion: string | null
   created_at: string
+  entregado_qty: number
 }
 
 // ── PAGOS ──────────────────────────────────────────────────────────────────
