@@ -103,6 +103,7 @@ El punto `•` dorado en la esquina inferior derecha de la carta digital es el a
 - Envío a cocina: guarda en Supabase y notifica en tiempo real
 - **Tracking de entrega ítem por ítem**: cada ítem enviado tiene un botón que la moza toca al entregarlo a la mesa (gris = sin entregar, dorado = parcial, verde = entregado). El estado persiste en Supabase y se sincroniza en tiempo real entre dispositivos. Banner "Todo entregado ✓" cuando la mesa está completa.
 - **Bebidas no van a cocina**: ítems de secciones BEBIDAS SIN ALCOHOL, CERVEZAS y TRAGOS se guardan como pedido `tipo='barra'` — la cocina nunca los ve. La moza los entrega directamente desde la barra.
+- **Estado del pedido en tiempo real**: los ítems "Ya enviado" se agrupan por pedido y muestran un badge de estado que se actualiza en tiempo real sin refresh: `En cocina` (dorado), `✓ Listo` (verde) cuando cocina marca el pedido listo, `🍺 Barra` (azul) para bebidas. La moza puede responder al cliente sobre el estado de su pedido sin ir a la cocina.
 
 **Tipos de sesión**
 | Tipo | Descripción |
@@ -239,6 +240,14 @@ Todas las tablas tienen RLS habilitado. Resumen de políticas:
 | `config` | SELECT | SELECT + write (dueño) | ALL |
 | `menu_secciones` | SELECT | SELECT + write (dueño) | ALL |
 | `menu_items` | SELECT | SELECT + write (dueño) | ALL |
+
+### Auto-logout por inactividad
+
+El personal (moza, caja, dueño) es deslogueado automáticamente si pasa **1 hora sin interacción** con la plataforma. Cualquier toque, click o scroll reinicia el timer. Al expirar se llama a `auth.logout()` y se redirige a `/login`.
+
+La pantalla de cocina es la **única excepción**: la tablet está diseñada para estar encendida toda la noche sin interacción, por lo que nunca se desloguea por inactividad — solo al tocar "Salir" explícitamente.
+
+Implementado como composable `useInactivityLogout` en `src/composables/` — se agrega a las páginas que deben forzar el timeout, y se omite en `KitchenPage`.
 
 ### Edge Function: `admin-users`
 
@@ -384,6 +393,7 @@ npm run test
 |--------|-------|-------------|
 | `menuMapper.ts` | 12 | Conversión de filas DB a estructura `MenuPagina[]`, incluyendo `va_a_cocina` |
 | `entrega.ts` | 10 | Lógica de tracking de entrega (`nextEntregadoQty`, `entregadoStatus`) |
+| `sessionGroups.ts` | 9 | Agrupamiento de items por pedido (`buildSessionGroups`) |
 
 Los tests verifican:
 - Mapeo de páginas regulares y de promos
@@ -393,3 +403,4 @@ Los tests verifican:
 - Casos borde: sección sin ítems, descripción nula, arrays vacíos
 - Ciclo de tracking: 0 → 1 → N → reset a 0
 - Estados de entrega: `none`, `partial`, `full`
+- Agrupamiento de items por pedido: grupos separados, orden cronológico, items sin pedido ignorados, tipo barra y estado preservados
