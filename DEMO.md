@@ -79,13 +79,37 @@ Tener abiertos en distintas pestañas/dispositivos:
 **Punto clave:**
 > *"La cocina ve el pedido en el instante en que la moza lo envía. Sin papel, sin gritos, sin confusiones."*
 
-### 3.4 Marcar pedido listo (desde cocina)
+### 3.4 Agregar una bebida (no va a cocina)
+
+1. Volver a la mesa, ir a la página de bebidas
+2. Agregar una Coca-Cola o una cerveza
+3. Tocar "Enviar a cocina"
+4. **Cambiar a la pestaña de cocina** — la bebida NO aparece
+5. Volver a la mesa — la bebida aparece en "Ya enviado" igual que la comida
+
+**Punto clave:**
+> *"Las bebidas las entrega la moza directamente desde la barra, no pasan por cocina. El sistema las registra en la cuenta pero no molesta al cocinero."*
+
+### 3.5 Tracking de entrega ítem por ítem
+
+> *"Cuando hay muchos pedidos, la moza puede perder track de qué llegó a cada mesa."*
+
+1. En la sección "Ya enviado" de la mesa, mostrar los botones de entrega por ítem
+2. Tocar el botón de una hamburguesa — cambia a dorado (parcial si había más de uno)
+3. Tocar de nuevo — verde con ✓ (todo entregado)
+4. Tocar de nuevo — vuelve a gris (reset)
+5. Entregar todos los ítems — aparece el banner "Todo entregado ✓" al final
+
+**Punto clave:**
+> *"La moza sabe exactamente qué salió a cada mesa. Útil cuando se lleva primero la bebida y después la comida, o cuando una mesa pide por partes."*
+
+### 3.6 Marcar pedido listo (desde cocina)
 
 1. En la pestaña de cocina: tocar "Listo" en el pedido
 2. **Volver a la pestaña de mesas** — mostrar la notificación "Pedido listo — Mesa 1"
 3. La notificación es visible aunque la moza esté en otra mesa o pantalla
 
-### 3.5 Cerrar la mesa con pago
+### 3.7 Cerrar la mesa con pago
 
 1. Volver a la Mesa 1
 2. Tocar "Cerrar mesa"
@@ -106,12 +130,12 @@ Tener abiertos en distintas pestañas/dispositivos:
 - El botón "Listo" para marcar un pedido completo
 
 **Hacer en vivo:**
-1. Desde la pestaña de moza, enviar un nuevo pedido
-2. Ver cómo aparece **solo** en la cocina sin hacer nada
+1. Desde la pestaña de moza, enviar un pedido de comida — aparece en cocina
+2. Desde la pestaña de moza, enviar una bebida — **no aparece en cocina**
 3. Señalar el beep de audio (si el volumen está activo)
 
 **Punto clave:**
-> *"La tablet de cocina nunca se apaga. Usa la API de Wake Lock del navegador para mantenerse encendida aunque pase horas sin tocarla."*
+> *"La tablet de cocina nunca se apaga. Usa la API de Wake Lock del navegador para mantenerse encendida aunque pase horas sin tocarla. Y solo muestra lo que realmente tiene que preparar — la cocina no ve bebidas."*
 
 ---
 

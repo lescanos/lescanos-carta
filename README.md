@@ -101,6 +101,8 @@ El punto `•` dorado en la esquina inferior derecha de la carta digital es el a
 - Ajuste de cubiertos desde el header
 - División del carrito: pendiente de envío / ya enviado a cocina
 - Envío a cocina: guarda en Supabase y notifica en tiempo real
+- **Tracking de entrega ítem por ítem**: cada ítem enviado tiene un botón que la moza toca al entregarlo a la mesa (gris = sin entregar, dorado = parcial, verde = entregado). El estado persiste en Supabase y se sincroniza en tiempo real entre dispositivos. Banner "Todo entregado ✓" cuando la mesa está completa.
+- **Bebidas no van a cocina**: ítems de secciones BEBIDAS SIN ALCOHOL, CERVEZAS y TRAGOS se guardan como pedido `tipo='barra'` — la cocina nunca los ve. La moza los entrega directamente desde la barra.
 
 **Tipos de sesión**
 | Tipo | Descripción |
@@ -136,6 +138,7 @@ El punto `•` dorado en la esquina inferior derecha de la carta digital es el a
 - Reloj digital en header actualizado cada segundo
 - Wake Lock: la tablet no se apaga mientras la pantalla está activa
 - Sección "Listos hoy" se limpia al hacer cierre de caja
+- **Bebidas filtradas**: pedidos `tipo='barra'` nunca aparecen en cocina — la cocina solo ve comida
 
 ### `/reportes` — Reportes y cierre de caja
 
@@ -182,13 +185,16 @@ sesiones         id, mesa, estado, tipo, cubiertos, moza_id, moza_nombre,
                  cliente_nombre, cliente_telefono, cliente_direccion,
                  cliente_referencia, closed_at, created_at
 pedidos          id, sesion_id, estado, tipo, listo_at, created_at
-pedido_items     id, pedido_id, sesion_id, nombre, precio, qty, nota, seccion
+                 tipo: 'pedido' | 'cambio' | 'cancelacion' | 'barra'
+pedido_items     id, pedido_id, sesion_id, nombre, precio, qty, nota, seccion,
+                 entregado_qty  ← tracking de entrega ítem por ítem
 pagos            id, sesion_id, metodo, monto, created_at
 cierres          id, fecha, total, efectivo, debito, credito,
                  transferencia, mercadopago, pedidosya, notas, created_at
 config           clave, valor  (num_mesas, costo_envio)
 menu_secciones   id, pagina, pagina_titulo, pagina_tipo, pagina_subtitulo,
-                 seccion_orden, emoji, titulo, nota, columnas
+                 seccion_orden, emoji, titulo, nota, columnas,
+                 va_a_cocina  ← false para secciones de bebidas
 menu_items       id, seccion_id, item_orden, nombre, descripcion, precios[]
 ```
 
@@ -207,6 +213,11 @@ Las migraciones están en `supabase/migrations/` y se aplican automáticamente c
 | `20240107` | RLS de escritura en perfiles (update/insert/delete) + grants |
 | `20240108` | Tablas `menu_secciones` y `menu_items` con RLS |
 | `20240109` | Seed inicial del menú completo |
+| `20240110` | Precios multi-columna para TORPEDOS; split CARLITOS / TOSTADOS |
+| `20240111` | `pedido_items.entregado_qty` — tracking de entrega ítem por ítem |
+| `20240112` | `pedido_items` en publicación Realtime |
+| `20240113` | RLS UPDATE columna-level en `entregado_qty`; cocina bloqueada |
+| `20240114` | `pedidos.tipo = 'barra'`; `menu_secciones.va_a_cocina`; bebidas marcadas como barra |
 
 ---
 
@@ -222,7 +233,7 @@ Todas las tablas tienen RLS habilitado. Resumen de políticas:
 | `perfiles` | — | SELECT + UPDATE (propio o dueño) | ALL |
 | `sesiones` | — | SELECT + write (según rol) | ALL |
 | `pedidos` | — | SELECT + write | ALL |
-| `pedido_items` | — | SELECT + write | ALL |
+| `pedido_items` | — | SELECT + write; UPDATE `entregado_qty` solo moza/caja/dueño | ALL |
 | `pagos` | — | SELECT + write | ALL |
 | `cierres` | — | SELECT + write (caja/dueño) | ALL |
 | `config` | SELECT | SELECT + write (dueño) | ALL |
@@ -371,11 +382,14 @@ npm run test
 
 | Módulo | Tests | Descripción |
 |--------|-------|-------------|
-| `menuMapper.ts` | 10 | Conversión de filas DB a estructura `MenuPagina[]` |
+| `menuMapper.ts` | 12 | Conversión de filas DB a estructura `MenuPagina[]`, incluyendo `va_a_cocina` |
+| `entrega.ts` | 10 | Lógica de tracking de entrega (`nextEntregadoQty`, `entregadoStatus`) |
 
 Los tests verifican:
 - Mapeo de páginas regulares y de promos
 - Items con precio único vs. multi-precio (por columnas)
 - Ordenamiento de páginas, secciones e ítems
-- Propagación de emoji, nota y columnas
+- Propagación de emoji, nota, columnas y `va_a_cocina`
 - Casos borde: sección sin ítems, descripción nula, arrays vacíos
+- Ciclo de tracking: 0 → 1 → N → reset a 0
+- Estados de entrega: `none`, `partial`, `full`
