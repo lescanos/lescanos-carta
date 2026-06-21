@@ -7,6 +7,7 @@ import { useCartStore } from '@/stores/cart.store'
 import { timeBsAs } from '@/utils/timezone'
 import type { Sesion, MenuPagina, PedidoItem } from '@/types/domain'
 import { nextEntregadoQty, entregadoStatus } from '@/utils/entrega'
+import { buildSessionGroups } from '@/utils/sessionGroups'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -222,6 +223,10 @@ const todoEntregado = computed(() =>
   sessionItemsDisplay.value
     .filter(i => !cancelledNames.value.has(i.nombre))
     .every(i => i.entregado_qty >= i.qty)
+)
+
+const sessionPedidoGroups = computed(() =>
+  buildSessionGroups(sessionItemsDisplay.value, cart.sessionPedidos)
 )
 
 // Total ajustado: sin ítems cancelados ni CAMBIO/CANCELACION
@@ -552,6 +557,9 @@ function setupListoNotifs() {
     .channel('moza-listo-global')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, payload => {
       if (payload.new?.estado !== 'listo') return
+      if (payload.new.sesion_id === cart.currentSession?.id) {
+        cart.updatePedidoEstado(payload.new.id as string, 'listo')
+      }
       const label = findLabelForSesion(payload.new.sesion_id as string)
       if (label) showListoNotif(label)
     })
@@ -925,44 +933,67 @@ async function doLogout() {
               <span class="text-[.78rem] text-green-400 font-bold">Todo entregado a la mesa</span>
             </div>
 
-            <div v-for="(item, idx) in sessionItemsDisplay" :key="idx"
-              :class="['flex items-center px-4 py-3 border-b border-white/[.05] gap-3',
-                cancelledNames.has(item.nombre) ? 'opacity-35' : '']">
-              <div class="bg-gold/40 text-black/50 text-[.75rem] font-bold rounded-[6px] px-2 py-0.5 flex-shrink-0">×{{ item.qty }}</div>
-              <div class="flex-1 min-w-0">
-                <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white/80']">
-                  {{ item.nombre }}
+            <!-- Grupos por pedido con badge de estado -->
+            <template v-for="group in sessionPedidoGroups" :key="group.pedido.id">
+              <!-- Cabecera del grupo -->
+              <div class="flex items-center gap-2 px-4 pt-2.5 pb-0.5">
+                <span class="text-[.52rem] text-gray-600 tracking-[.12em] uppercase flex-1">
+                  Enviado a las {{ new Date(group.pedido.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }}
+                </span>
+                <span v-if="group.pedido.tipo === 'barra'"
+                  class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400">
+                  🍺 Barra
+                </span>
+                <span v-else-if="group.pedido.estado === 'listo'"
+                  class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
+                  ✓ Listo
+                </span>
+                <span v-else
+                  class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-gold/12 text-gold/70">
+                  En cocina
+                </span>
+              </div>
+
+              <!-- Items del grupo -->
+              <div v-for="item in group.items" :key="item.id"
+                :class="['flex items-center px-4 py-3 border-b border-white/[.05] gap-3',
+                  cancelledNames.has(item.nombre) ? 'opacity-35' : '']">
+                <div class="bg-gold/40 text-black/50 text-[.75rem] font-bold rounded-[6px] px-2 py-0.5 flex-shrink-0">×{{ item.qty }}</div>
+                <div class="flex-1 min-w-0">
+                  <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white/80']">
+                    {{ item.nombre }}
+                  </div>
+                  <div v-if="cancelledNames.has(item.nombre)"
+                    class="text-[.6rem] text-red-400/60 tracking-[.06em] uppercase mt-0.5">Cancelado</div>
+                  <div v-else-if="item.nota" class="text-[.65rem] text-gray-500 italic mt-0.5">📝 {{ item.nota }}</div>
                 </div>
-                <div v-if="cancelledNames.has(item.nombre)"
-                  class="text-[.6rem] text-red-400/60 tracking-[.06em] uppercase mt-0.5">Cancelado</div>
-                <div v-else-if="item.nota" class="text-[.65rem] text-gray-500 italic mt-0.5">📝 {{ item.nota }}</div>
-              </div>
-              <div v-if="item.precio && item.precio !== '$0' && !cancelledNames.has(item.nombre)"
-                class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
+                <div v-if="item.precio && item.precio !== '$0' && !cancelledNames.has(item.nombre)"
+                  class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
 
-              <!-- Botón de entrega -->
-              <button v-if="!cancelledNames.has(item.nombre)"
-                @click.stop="marcarEntregado(item)"
-                :class="[
-                  'flex-shrink-0 min-w-[44px] text-center text-[.72rem] font-bold px-2 py-1.5 rounded-lg border cursor-pointer transition-colors',
-                  entregadoStatus(item.entregado_qty, item.qty) === 'none'    ? 'border-white/15 text-white/30 bg-transparent' :
-                  entregadoStatus(item.entregado_qty, item.qty) === 'full'    ? 'border-green-500/50 text-green-400 bg-green-500/[.1]' :
-                                                                                'border-gold/50 text-gold bg-gold/[.08]'
-                ]">
-                {{ entregadoStatus(item.entregado_qty, item.qty) === 'full' ? '✓' : `${item.entregado_qty}/${item.qty}` }}
-              </button>
+                <!-- Botón de entrega -->
+                <button v-if="!cancelledNames.has(item.nombre)"
+                  @click.stop="marcarEntregado(item)"
+                  :class="[
+                    'flex-shrink-0 min-w-[44px] text-center text-[.72rem] font-bold px-2 py-1.5 rounded-lg border cursor-pointer transition-colors',
+                    entregadoStatus(item.entregado_qty, item.qty) === 'none'    ? 'border-white/15 text-white/30 bg-transparent' :
+                    entregadoStatus(item.entregado_qty, item.qty) === 'full'    ? 'border-green-500/50 text-green-400 bg-green-500/[.1]' :
+                                                                                  'border-gold/50 text-gold bg-gold/[.08]'
+                  ]">
+                  {{ entregadoStatus(item.entregado_qty, item.qty) === 'full' ? '✓' : `${item.entregado_qty}/${item.qty}` }}
+                </button>
 
-              <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
-                <button @click.stop="openCambio(item)"
-                  class="border border-[#E89500]/50 text-[#E89500] text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
-                  ⚠ Cambiar
-                </button>
-                <button @click.stop="confirmarCancelacion(item)"
-                  class="border border-red-400/40 text-red-400 text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
-                  ✕ Cancelar
-                </button>
+                <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
+                  <button @click.stop="openCambio(item)"
+                    class="border border-[#E89500]/50 text-[#E89500] text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
+                    ⚠ Cambiar
+                  </button>
+                  <button @click.stop="confirmarCancelacion(item)"
+                    class="border border-red-400/40 text-red-400 text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
+                    ✕ Cancelar
+                  </button>
+                </div>
               </div>
-            </div>
+            </template>
           </div>
 
           <div v-if="cart.mesaKey?.startsWith('envio_') && costoEnvio > 0"

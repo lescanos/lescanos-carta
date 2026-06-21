@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import { supabase } from '@/services/supabase'
 import { useAuthStore } from '@/stores/auth.store'
 import { timeBsAs } from '@/utils/timezone'
-import type { CartItem, PedidoItem, Sesion } from '@/types/domain'
+import type { CartItem, PedidoItem, Sesion, EstadoPedido } from '@/types/domain'
+import type { SessionPedidoRef } from '@/utils/sessionGroups'
 
 export const useCartStore = defineStore('cart', () => {
   const auth = useAuthStore()
@@ -13,6 +14,7 @@ export const useCartStore = defineStore('cart', () => {
   const cart           = ref<CartItem[]>([])
   const currentSession = ref<Sesion | null>(null)
   const sessionItems   = ref<PedidoItem[]>([])
+  const sessionPedidos = ref<SessionPedidoRef[]>([])
   const cubiertos      = ref(1)
 
   // ── Computed ─────────────────────────────────────────
@@ -129,12 +131,25 @@ export const useCartStore = defineStore('cart', () => {
 
   async function loadSessionItems() {
     if (!currentSession.value) return
-    const { data } = await supabase
-      .from('pedido_items')
-      .select('*')
-      .eq('sesion_id', currentSession.value.id)
-      .order('created_at', { ascending: true })
-    sessionItems.value = (data as PedidoItem[]) ?? []
+    const [{ data: items }, { data: pedidos }] = await Promise.all([
+      supabase
+        .from('pedido_items')
+        .select('*')
+        .eq('sesion_id', currentSession.value.id)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('pedidos')
+        .select('id, estado, tipo, created_at')
+        .eq('sesion_id', currentSession.value.id)
+        .order('created_at', { ascending: true }),
+    ])
+    sessionItems.value = (items as PedidoItem[]) ?? []
+    sessionPedidos.value = (pedidos as SessionPedidoRef[]) ?? []
+  }
+
+  function updatePedidoEstado(id: string, estado: EstadoPedido) {
+    const p = sessionPedidos.value.find(p => p.id === id)
+    if (p) p.estado = estado
   }
 
   async function setCubiertos(n: number) {
@@ -267,6 +282,7 @@ export const useCartStore = defineStore('cart', () => {
     cart.value = []
     currentSession.value = null
     sessionItems.value = []
+    sessionPedidos.value = []
     cubiertos.value = 1
   }
 
@@ -303,12 +319,13 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   return {
-    mesaKey, cart, currentSession, sessionItems, cubiertos,
+    mesaKey, cart, currentSession, sessionItems, sessionPedidos, cubiertos,
     cartCount, cartTotal, sessionTotal, grandTotal, hasRealPrices, mesaLabel,
     parsePrecio, cartLoad, cartClear,
     addItem, removeItem, removeCartEntry, setItemNote,
     openOrLoadSession, loadSessionItems, setCubiertos,
     saveOrder, sendCambio, sendCancelacion, addPago, closeSessionOnly, closeSession, deleteSessionIfEmpty, clearState,
+    updatePedidoEstado,
     buildMsg,
   }
 })
