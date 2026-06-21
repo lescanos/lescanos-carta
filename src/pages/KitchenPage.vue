@@ -26,7 +26,7 @@ let kitchenChannel: ReturnType<typeof supabase.channel> | null = null
 let cierreChannel: ReturnType<typeof supabase.channel> | null = null
 
 // ── Computed ──────────────────────────────────────────
-const pendingOrders = computed(() => orders.value.filter(o => o.estado === 'pendiente'))
+const pendingOrders = computed(() => orders.value.filter(o => o.estado === 'pendiente' || o.estado === 'en_preparacion'))
 const doneOrders    = computed(() => orders.value.filter(o => o.estado === 'listo'))
 
 // ── Helpers ───────────────────────────────────────────
@@ -137,8 +137,20 @@ async function loadOrders() {
   }
 }
 
-// ── Mark as ready ─────────────────────────────────────
+// ── Mark as ready / en preparacion ───────────────────
 const markingReady = ref<Set<string>>(new Set())
+const markingPrep  = ref<Set<string>>(new Set())
+
+async function markEnPreparacion(id: string) {
+  if (markingPrep.value.has(id)) return
+  markingPrep.value = new Set([...markingPrep.value, id])
+  try {
+    await supabase.from('pedidos').update({ estado: 'en_preparacion' }).eq('id', id)
+    const order = orders.value.find(o => o.id === id)
+    if (order) order.estado = 'en_preparacion'
+  } catch { /* ignore */ }
+  markingPrep.value = new Set([...markingPrep.value].filter(x => x !== id))
+}
 
 async function markListo(id: string) {
   if (markingReady.value.has(id)) return
@@ -363,16 +375,35 @@ async function doLogout() {
               </div>
             </div>
 
-            <!-- Listo button -->
-            <button
-              @click="markListo(order.id)"
-              :disabled="markingReady.has(order.id)"
-              class="w-[calc(100%-28px)] mx-3.5 mb-3.5 mt-2.5 py-3.5 bg-[#2d7a2d] text-white border-none rounded-[10px]
-                     font-black text-[.95rem] tracking-[.06em] cursor-pointer disabled:opacity-50 disabled:cursor-default
-                     active:bg-[#1e5c1e] active:scale-[.98] transition-all"
-            >
-              {{ markingReady.has(order.id) ? 'Guardando...' : '✓  Listo' }}
-            </button>
+            <!-- Botones de acción -->
+            <div class="flex gap-2 mx-3.5 mb-3.5 mt-2.5">
+              <!-- En preparación (solo si está pendiente) -->
+              <button v-if="order.estado === 'pendiente'"
+                @click="markEnPreparacion(order.id)"
+                :disabled="markingPrep.has(order.id)"
+                class="flex-1 py-3.5 bg-[#4a3a00] text-[#E89500] border-2 border-[#E89500]/50 rounded-[10px]
+                       font-black text-[.82rem] tracking-[.04em] cursor-pointer disabled:opacity-50 disabled:cursor-default
+                       active:bg-[#3a2c00] active:scale-[.98] transition-all"
+              >
+                {{ markingPrep.has(order.id) ? '...' : '🍳 Preparando' }}
+              </button>
+              <!-- Badge si ya está en preparación -->
+              <div v-else-if="order.estado === 'en_preparacion'"
+                class="flex-1 py-3.5 text-center bg-[#E89500]/10 border-2 border-[#E89500]/40 rounded-[10px]
+                       font-black text-[.82rem] text-[#E89500] tracking-[.04em]">
+                🍳 En preparación
+              </div>
+              <!-- Listo -->
+              <button
+                @click="markListo(order.id)"
+                :disabled="markingReady.has(order.id)"
+                class="flex-1 py-3.5 bg-[#2d7a2d] text-white border-none rounded-[10px]
+                       font-black text-[.95rem] tracking-[.06em] cursor-pointer disabled:opacity-50 disabled:cursor-default
+                       active:bg-[#1e5c1e] active:scale-[.98] transition-all"
+              >
+                {{ markingReady.has(order.id) ? 'Guardando...' : '✓  Listo' }}
+              </button>
+            </div>
           </div>
         </div>
 

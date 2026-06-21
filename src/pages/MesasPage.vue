@@ -556,12 +556,15 @@ function setupListoNotifs() {
   listoChannel = supabase
     .channel('moza-listo-global')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, payload => {
-      if (payload.new?.estado !== 'listo') return
+      const nuevoEstado = payload.new?.estado as import('@/types/domain').EstadoPedido | undefined
+      if (!nuevoEstado) return
       if (payload.new.sesion_id === cart.currentSession?.id) {
-        cart.updatePedidoEstado(payload.new.id as string, 'listo')
+        cart.updatePedidoEstado(payload.new.id as string, nuevoEstado)
       }
-      const label = findLabelForSesion(payload.new.sesion_id as string)
-      if (label) showListoNotif(label)
+      if (nuevoEstado === 'listo') {
+        const label = findLabelForSesion(payload.new.sesion_id as string)
+        if (label) showListoNotif(label)
+      }
     })
     .subscribe()
 }
@@ -947,6 +950,10 @@ async function doLogout() {
                 <span v-else-if="group.pedido.estado === 'listo'"
                   class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
                   ✓ Listo
+                </span>
+                <span v-else-if="group.pedido.estado === 'en_preparacion'"
+                  class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-[#E89500]/15 text-[#E89500]">
+                  🍳 Preparando
                 </span>
                 <span v-else
                   class="text-[.52rem] font-bold tracking-[.08em] px-1.5 py-0.5 rounded-full bg-gold/12 text-gold/70">

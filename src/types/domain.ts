@@ -39,7 +39,7 @@ export interface Sesion {
 }
 
 // ── PEDIDOS ────────────────────────────────────────────────────────────────
-export type EstadoPedido = 'pendiente' | 'listo'
+export type EstadoPedido = 'pendiente' | 'en_preparacion' | 'listo'
 export type TipoPedido = 'pedido' | 'cambio' | 'cancelacion' | 'barra'
 
 export interface Pedido {
