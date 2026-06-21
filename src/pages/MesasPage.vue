@@ -8,10 +8,13 @@ import { timeBsAs } from '@/utils/timezone'
 import type { Sesion, MenuPagina, PedidoItem } from '@/types/domain'
 import { nextEntregadoQty, entregadoStatus } from '@/utils/entrega'
 import { buildSessionGroups } from '@/utils/sessionGroups'
+import { useInactivityLogout } from '@/composables/useInactivityLogout'
 
 const router = useRouter()
 const auth   = useAuthStore()
 const cart   = useCartStore()
+
+useInactivityLogout()
 
 // ── View state ────────────────────────────────────────
 type View = 'mesas' | 'menu' | 'resumen' | 'split'

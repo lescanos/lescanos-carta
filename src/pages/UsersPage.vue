@@ -2,8 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
+import { useInactivityLogout } from '@/composables/useInactivityLogout'
 
 const router = useRouter()
+
+useInactivityLogout()
 
 // ── TABS ──────────────────────────────────────────────────────────────────
 type Tab = 'usuarios' | 'menu' | 'config'

@@ -4,9 +4,12 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
 import { useAuthStore } from '@/stores/auth.store'
 import { todayBsAs, dayStartUTC, dayEndUTC } from '@/utils/timezone'
+import { useInactivityLogout } from '@/composables/useInactivityLogout'
 
 const router = useRouter()
 const auth   = useAuthStore()
+
+useInactivityLogout()
 
 // ── Types ─────────────────────────────────────────────
 interface SessionRow {
