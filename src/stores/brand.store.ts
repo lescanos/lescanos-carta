@@ -40,6 +40,8 @@ export const useBrandStore = defineStore('brand', () => {
   const cacheKey = computed(() => `brand_${config.value.emailDomain}`)
 
   async function init() {
+    if (loaded.value) return
+
     // Intenta cargar desde localStorage primero (para render inmediato)
     try {
       const cached = localStorage.getItem('brand_config')

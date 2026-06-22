@@ -31,6 +31,11 @@ onMounted(async () => {
     return
   }
 
+  // Garantiza que la brand config (incluyendo emailDomain) esté cargada antes
+  // de mostrar el formulario. Sin esto, el login puede usar el dominio del cache
+  // viejo de localStorage antes de que llegue la respuesta de Supabase.
+  await brand.init()
+
   const { data } = await supabase
     .from('perfiles_publicos')
     .select('id, nombre, login_key, emoji, activo')
