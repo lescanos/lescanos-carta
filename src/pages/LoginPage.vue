@@ -3,10 +3,12 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
 import { useAuthStore } from '@/stores/auth.store'
+import { useBrandStore } from '@/stores/brand.store'
 import type { Perfil, Rol } from '@/types/domain'
 
 const router  = useRouter()
 const auth    = useAuthStore()
+const brand   = useBrandStore()
 
 const perfiles     = ref<Perfil[]>([])
 const selected     = ref<Perfil | null>(null)
@@ -49,7 +51,7 @@ async function login() {
   loading.value = true
   error.value = ''
 
-  const email = `${selected.value.login_key}@lescanos.local`
+  const email = `${selected.value.login_key}@${brand.config.emailDomain}`
   const { error: authError } = await supabase.auth.signInWithPassword({ email, password: password.value })
 
   if (authError) {
@@ -69,7 +71,7 @@ async function login() {
 <template>
   <div class="min-h-screen bg-dark flex flex-col items-center justify-center p-6">
     <!-- Brand -->
-    <div class="font-display text-4xl font-black text-gold tracking-widest mb-2">Lescano's</div>
+    <div class="font-display text-4xl font-black text-gold tracking-widest mb-2">{{ brand.config.nombre }}</div>
     <div class="text-xs text-gray-500 tracking-[.22em] uppercase mb-10">Sistema de gestión</div>
 
     <!-- Selección de perfil -->

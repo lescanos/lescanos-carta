@@ -7,7 +7,7 @@
         <div v-if="page.tipo === 'promos'" class="slide slide-promo">
           <div class="promo-inner">
             <div class="promo-head">
-              <div class="promo-brand">— LESCANO'S —</div>
+              <div class="promo-brand">— {{ brand.config.nombre.toUpperCase() }} —</div>
               <div class="promo-big-title">PROMOS</div>
               <div v-if="page.subtitulo" class="promo-period">({{ page.subtitulo }})</div>
             </div>
@@ -24,17 +24,17 @@
         <!-- Regular slide -->
         <div v-else class="slide">
           <div class="panel-left">
-            <div class="brand-name">LESCANO'S</div>
-            <div class="brand-sub">FAST FOOD</div>
+            <div class="brand-name">{{ brand.config.nombre.toUpperCase() }}</div>
+            <div class="brand-sub">{{ brand.config.subtitulo }}</div>
             <div class="gold-line" />
-            <img class="logo-img" :src="logoSrc" alt="Logo Lescano's" />
+            <img class="logo-img" :src="logoSrc" :alt="`Logo ${brand.config.nombre}`" />
             <div class="gold-line" />
             <div class="contact-title">CONTACTO</div>
             <ul class="contact-list">
-              <li>📍 Oroño 5729, Rosario</li>
-              <li>📱 341 549-4790</li>
-              <li>📸 @lescanos_oficial</li>
-              <li>👥 Lescanos Oficial</li>
+              <li v-if="brand.config.contactoDireccion">📍 {{ brand.config.contactoDireccion }}</li>
+              <li v-if="brand.config.contactoTelefono">📱 {{ brand.config.contactoTelefono }}</li>
+              <li v-if="brand.config.contactoInstagram">📸 {{ brand.config.contactoInstagram }}</li>
+              <li v-if="brand.config.contactoFacebook">👥 {{ brand.config.contactoFacebook }}</li>
             </ul>
           </div>
           <div class="panel-right">
@@ -92,21 +92,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import logoFile from '@/assets/logo.png'
 import { supabase } from '@/services/supabase'
+import { useBrandStore } from '@/stores/brand.store'
 import { dbRowsToMenuPaginas } from '@/utils/menuMapper'
 import type { MenuPagina, MenuSeccionRow, MenuItemRow } from '@/types/domain'
 
 const router = useRouter()
+const brand  = useBrandStore()
 
 const logoSrc = logoFile
+
+// Cache key basado en el dominio de la marca (neutral entre clientes)
+const CACHE_KEY = computed(() => `carta_${brand.config.emailDomain}`)
 
 // ── CARTA DATA ─────────────────────────────────────────────────────────────
 function getCachedMenu(): MenuPagina[] {
   try {
-    const s = localStorage.getItem('lescanos_carta')
+    // Intenta con la clave nueva (basada en la marca)
+    const key = `carta_${brand.config.emailDomain}`
+    const s = localStorage.getItem(key) ?? localStorage.getItem('lescanos_carta')
     if (s) return JSON.parse(s)
   } catch {}
   const w = window as unknown as Record<string, unknown>
@@ -125,7 +132,7 @@ async function loadMenuFromDB() {
   const paginas = dbRowsToMenuPaginas(secciones as MenuSeccionRow[], items as MenuItemRow[])
   if (paginas.length > 0) {
     carta.value = paginas
-    localStorage.setItem('lescanos_carta', JSON.stringify(paginas))
+    localStorage.setItem(CACHE_KEY.value, JSON.stringify(paginas))
   }
 }
 

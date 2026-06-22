@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
+import { useBrandStore } from '@/stores/brand.store'
 import { useInactivityLogout } from '@/composables/useInactivityLogout'
 
 const router = useRouter()
@@ -362,8 +363,39 @@ async function saveItemPrecios(item: MenuItemEditable) {
 // ══════════════════════════════════════════════════════════════════════════
 // TAB: CONFIGURACIÓN
 // ══════════════════════════════════════════════════════════════════════════
+const brandStore       = useBrandStore()
 const costoEnvioEdit   = ref('')
 const costoEnvioSaving = ref(false)
+
+// Brand fields — editables localmente, se guardan al tocar Guardar
+const brandNombre     = ref('')
+const brandSubtitulo  = ref('')
+const brandDireccion  = ref('')
+const brandTelefono   = ref('')
+const brandInstagram  = ref('')
+const brandFacebook   = ref('')
+const brandSaving     = ref(false)
+
+function syncBrandRefs() {
+  brandNombre.value    = brandStore.config.nombre
+  brandSubtitulo.value = brandStore.config.subtitulo
+  brandDireccion.value = brandStore.config.contactoDireccion
+  brandTelefono.value  = brandStore.config.contactoTelefono
+  brandInstagram.value = brandStore.config.contactoInstagram
+  brandFacebook.value  = brandStore.config.contactoFacebook
+}
+
+async function saveBrand() {
+  brandSaving.value = true
+  await brandStore.update('nombre',            brandNombre.value)
+  await brandStore.update('subtitulo',         brandSubtitulo.value)
+  await brandStore.update('contactoDireccion', brandDireccion.value)
+  await brandStore.update('contactoTelefono',  brandTelefono.value)
+  await brandStore.update('contactoInstagram', brandInstagram.value)
+  await brandStore.update('contactoFacebook',  brandFacebook.value)
+  brandSaving.value = false
+  showToast('Identidad del negocio actualizada ✓')
+}
 
 async function loadConfig() {
   const { data } = await supabase.from('config').select('clave,valor').eq('clave', 'costo_envio').single()
@@ -381,6 +413,8 @@ async function saveCostoEnvio() {
 onMounted(async () => {
   await loadPerfiles()
   await loadConfig()
+  await brandStore.init()
+  syncBrandRefs()
 })
 </script>
 
@@ -529,23 +563,69 @@ onMounted(async () => {
 
       <!-- ══ CONFIG ══ -->
       <template v-else-if="activeTab === 'config'">
-        <div class="px-4 pt-5 pb-4">
-          <div class="text-[.6rem] text-gray-500 tracking-[.18em] uppercase mb-3">Configuración</div>
-          <div class="bg-dark2 border border-gold/[.15] rounded-xl px-4 py-3.5 flex items-center gap-3">
-            <div class="flex-1">
-              <div class="text-[.85rem] font-bold text-white">🛵 Costo de envío</div>
-              <div class="text-[.65rem] text-gray-500 mt-0.5">Se suma a todos los pedidos de envío a domicilio</div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <span class="text-[.9rem] text-gold font-mono">$</span>
-              <input v-model="costoEnvioEdit" type="number" min="0" step="100"
-                class="w-[90px] bg-white/[.06] border border-gold/[.18] text-gold text-[.9rem] font-bold px-2.5 py-1.5 rounded-[8px] focus:outline-none focus:border-gold/50 text-right" />
-              <button @click="saveCostoEnvio" :disabled="costoEnvioSaving"
-                class="text-[.72rem] font-bold bg-gold text-dark px-3 py-1.5 rounded-lg border-none cursor-pointer disabled:opacity-50">
-                {{ costoEnvioSaving ? '...' : 'Guardar' }}
+        <div class="px-4 pt-5 pb-6 space-y-5">
+
+          <!-- Identidad del negocio -->
+          <div>
+            <div class="text-[.6rem] text-gray-500 tracking-[.18em] uppercase mb-3">Identidad del negocio</div>
+            <div class="bg-dark2 border border-gold/[.15] rounded-xl px-4 py-4 space-y-3">
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">Nombre</label>
+                <input v-model="brandNombre" placeholder="Ej: Mi Resto"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">Subtítulo / Tipo</label>
+                <input v-model="brandSubtitulo" placeholder="Ej: PARRILLA · BAR"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">📍 Dirección</label>
+                <input v-model="brandDireccion" placeholder="Ej: Av. Corrientes 1234, Buenos Aires"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">📱 Teléfono</label>
+                <input v-model="brandTelefono" placeholder="Ej: 341 000-0000"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">📸 Instagram</label>
+                <input v-model="brandInstagram" placeholder="Ej: @minegocio"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <div>
+                <label class="text-[.65rem] text-gray-500 uppercase tracking-[.12em] block mb-1">👥 Facebook</label>
+                <input v-model="brandFacebook" placeholder="Ej: Mi Negocio Oficial"
+                  class="w-full bg-white/[.06] border border-gold/[.18] text-white text-[.88rem] px-3 py-2 rounded-[8px] focus:outline-none focus:border-gold/50" />
+              </div>
+              <button @click="saveBrand" :disabled="brandSaving"
+                class="w-full mt-1 py-2.5 bg-gold text-dark font-bold text-[.85rem] rounded-[10px] border-none cursor-pointer disabled:opacity-45 tracking-[.04em]">
+                {{ brandSaving ? 'Guardando...' : 'Guardar identidad' }}
               </button>
             </div>
           </div>
+
+          <!-- Costo de envío -->
+          <div>
+            <div class="text-[.6rem] text-gray-500 tracking-[.18em] uppercase mb-3">Operación</div>
+            <div class="bg-dark2 border border-gold/[.15] rounded-xl px-4 py-3.5 flex items-center gap-3">
+              <div class="flex-1">
+                <div class="text-[.85rem] font-bold text-white">🛵 Costo de envío</div>
+                <div class="text-[.65rem] text-gray-500 mt-0.5">Se suma a todos los pedidos de envío a domicilio</div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-[.9rem] text-gold font-mono">$</span>
+                <input v-model="costoEnvioEdit" type="number" min="0" step="100"
+                  class="w-[90px] bg-white/[.06] border border-gold/[.18] text-gold text-[.9rem] font-bold px-2.5 py-1.5 rounded-[8px] focus:outline-none focus:border-gold/50 text-right" />
+                <button @click="saveCostoEnvio" :disabled="costoEnvioSaving"
+                  class="text-[.72rem] font-bold bg-gold text-dark px-3 py-1.5 rounded-lg border-none cursor-pointer disabled:opacity-50">
+                  {{ costoEnvioSaving ? '...' : 'Guardar' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </template>
 
