@@ -391,6 +391,7 @@ var DEFAULT_CARTA = [
         "emoji": "🥤",
         "titulo": "BEBIDAS SIN ALCOHOL",
         "nota": "",
+        "va_a_cocina": false,
         "items": [
           {
             "nombre": "Gaseosa 500ml",
@@ -418,6 +419,7 @@ var DEFAULT_CARTA = [
         "emoji": "🍺",
         "titulo": "CERVEZAS",
         "nota": "",
+        "va_a_cocina": false,
         "items": [
           {
             "nombre": "Lata Isenbeck 473cc",
@@ -445,6 +447,7 @@ var DEFAULT_CARTA = [
         "emoji": "🍹",
         "titulo": "TRAGOS",
         "nota": "",
+        "va_a_cocina": false,
         "items": [
           {
             "nombre": "Fernet",
