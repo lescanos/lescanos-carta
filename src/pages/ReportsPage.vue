@@ -196,7 +196,7 @@ async function openCierreModal() {
   const { data: openSes } = await supabase.from('sesiones').select('id', { count: 'exact' }).eq('estado', 'abierta')
   if ((openSes?.length ?? 0) > 0) blockers.push(`Hay ${openSes!.length} mesa(s) aún abiertas. Cerrá todas las mesas antes de hacer el cierre.`)
 
-  const { data: pendPed } = await supabase.from('pedidos').select('id', { count: 'exact' }).eq('estado', 'pendiente')
+  const { data: pendPed } = await supabase.from('pedidos').select('id', { count: 'exact' }).eq('estado', 'pendiente').neq('tipo', 'barra')
   if ((pendPed?.length ?? 0) > 0) blockers.push(`Hay ${pendPed!.length} pedido(s) pendientes en cocina. Esperá que estén listos.`)
 
   cierreBlockers.value = blockers

@@ -419,7 +419,7 @@ async function openPayment() {
   const sesionId = cart.currentSession?.id
   if (sesionId) {
     const { data: pending } = await supabase
-      .from('pedidos').select('id').eq('sesion_id', sesionId).eq('estado', 'pendiente').limit(1)
+      .from('pedidos').select('id').eq('sesion_id', sesionId).eq('estado', 'pendiente').neq('tipo', 'barra').limit(1)
     if (pending && pending.length > 0) {
       if (!confirm('Hay pedidos pendientes en cocina. ¿Cerrar la mesa igual?')) return
     }
