@@ -31,3 +31,7 @@ supabase/.temp/
 # OS
 .DS_Store
 Thumbs.db
+
+# Documentación interna (no subir al repo del cliente)
+_docs/
+.planning/
