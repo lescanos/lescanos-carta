@@ -22,6 +22,7 @@ const baseItem = (overrides: Partial<PedidoItem> = {}): PedidoItem => ({
   seccion: 'HAMBURGUESAS',
   created_at: '2024-01-14T20:00:01Z',
   entregado_qty: 0,
+  cancelado: false,
   ...overrides,
 })
 
