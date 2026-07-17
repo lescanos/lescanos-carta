@@ -223,6 +223,7 @@ export const useCartStore = defineStore('cart', () => {
       .select()
       .single()
     if (pErr) throw pErr
+    // Notifica a cocina
     await supabase.from('pedido_items').insert({
       pedido_id: pedido.id,
       sesion_id: currentSession.value.id,
@@ -232,6 +233,8 @@ export const useCartStore = defineStore('cart', () => {
       precio: '$0',
       seccion: 'CANCELACION',
     })
+    // Marca el ítem original como cancelado — el UPDATE lo captura el realtime
+    await supabase.from('pedido_items').update({ cancelado: true }).eq('id', item.id)
   }
 
   async function addPago(metodo: string, monto: number) {

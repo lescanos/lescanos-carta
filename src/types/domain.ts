@@ -65,6 +65,7 @@ export interface PedidoItem {
   seccion: string | null
   created_at: string
   entregado_qty: number
+  cancelado: boolean
 }
 
 // ── PAGOS ──────────────────────────────────────────────────────────────────

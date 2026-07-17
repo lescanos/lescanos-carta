@@ -211,12 +211,7 @@ function buildItemsMap() {
 const currentPage = computed<MenuPagina | null>(() => menuPages.value[pageIdx.value] ?? null)
 
 // ── Cancelados ────────────────────────────────────────
-// Nombres de ítems que tienen una entrada de CANCELACION en sessionItems
-const cancelledNames = computed(() =>
-  new Set(cart.sessionItems.filter(i => i.seccion === 'CANCELACION').map(i => i.nombre))
-)
-
-// sessionItems visibles: sin CANCELACION ni CAMBIO
+// sessionItems visibles: sin notificaciones de CANCELACION ni CAMBIO
 const sessionItemsDisplay = computed(() =>
   cart.sessionItems.filter(i => i.seccion !== 'CANCELACION' && i.seccion !== 'CAMBIO')
 )
@@ -224,7 +219,7 @@ const sessionItemsDisplay = computed(() =>
 const todoEntregado = computed(() =>
   sessionItemsDisplay.value.length > 0 &&
   sessionItemsDisplay.value
-    .filter(i => !cancelledNames.value.has(i.nombre))
+    .filter(i => !i.cancelado)
     .every(i => i.entregado_qty >= i.qty)
 )
 
@@ -232,10 +227,10 @@ const sessionPedidoGroups = computed(() =>
   buildSessionGroups(sessionItemsDisplay.value, cart.sessionPedidos)
 )
 
-// Total ajustado: sin ítems cancelados ni CAMBIO/CANCELACION
+// Total ajustado: sin ítems cancelados
 const sessionTotalAdjusted = computed(() =>
   sessionItemsDisplay.value
-    .filter(i => !cancelledNames.value.has(i.nombre))
+    .filter(i => !i.cancelado)
     .reduce((s, i) => s + cart.parsePrecio(i.precio) * i.qty, 0)
 )
 
@@ -247,7 +242,7 @@ const grandTotalAdjusted = computed(() => {
 const allSplitItems = computed(() => {
   const out: Array<{ splitKey: string; nombre: string; precio?: string; qty: number; nota?: string; isCart: boolean }> = []
   cart.cart.forEach((item, idx) => out.push({ nombre: item.nombre, precio: item.precio, qty: item.qty, nota: item.nota, splitKey: `c${idx}`, isCart: true }))
-  cart.sessionItems.forEach((item, idx) => out.push({ nombre: item.nombre, precio: item.precio ?? undefined, qty: item.qty, nota: item.nota ?? undefined, splitKey: `s${idx}`, isCart: false }))
+  cart.sessionItems.filter(i => !i.cancelado && i.seccion !== 'CANCELACION' && i.seccion !== 'CAMBIO').forEach((item, idx) => out.push({ nombre: item.nombre, precio: item.precio ?? undefined, qty: item.qty, nota: item.nota ?? undefined, splitKey: `s${idx}`, isCart: false }))
   return out
 })
 
@@ -622,7 +617,10 @@ function setupEntregaRealtime(sesionId: string) {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedido_items', filter: `sesion_id=eq.${sesionId}` }, payload => {
       const updated = payload.new as import('@/types/domain').PedidoItem
       const item = cart.sessionItems.find(i => i.id === updated.id)
-      if (item) item.entregado_qty = updated.entregado_qty
+      if (item) {
+        item.entregado_qty = updated.entregado_qty
+        item.cancelado = updated.cancelado
+      }
     })
     .subscribe()
 }
@@ -960,21 +958,21 @@ async function doLogout() {
               <!-- Items del grupo -->
               <div v-for="item in group.items" :key="item.id"
                 :class="['flex items-center px-4 py-3 border-b border-white/[.05] gap-3',
-                  cancelledNames.has(item.nombre) ? 'opacity-35' : '']">
+                  item.cancelado ? 'opacity-35' : '']">
                 <div class="bg-gold/40 text-black/50 text-[.75rem] font-bold rounded-[6px] px-2 py-0.5 flex-shrink-0">×{{ item.qty }}</div>
                 <div class="flex-1 min-w-0">
-                  <div :class="['text-[.9rem] font-medium', cancelledNames.has(item.nombre) ? 'text-red-400/70 line-through' : 'text-white/80']">
+                  <div :class="['text-[.9rem] font-medium', item.cancelado ? 'text-red-400/70 line-through' : 'text-white/80']">
                     {{ item.nombre }}
                   </div>
-                  <div v-if="cancelledNames.has(item.nombre)"
+                  <div v-if="item.cancelado"
                     class="text-[.6rem] text-red-400/60 tracking-[.06em] uppercase mt-0.5">Cancelado</div>
                   <div v-else-if="item.nota" class="text-[.65rem] text-gray-500 italic mt-0.5">📝 {{ item.nota }}</div>
                 </div>
-                <div v-if="item.precio && item.precio !== '$0' && !cancelledNames.has(item.nombre)"
+                <div v-if="item.precio && item.precio !== '$0' && !item.cancelado"
                   class="font-display text-[.82rem] text-gold">{{ item.precio }}</div>
 
                 <!-- Botón de entrega -->
-                <button v-if="!cancelledNames.has(item.nombre)"
+                <button v-if="!item.cancelado"
                   @click.stop="marcarEntregado(item)"
                   :class="[
                     'flex-shrink-0 min-w-[44px] text-center text-[.72rem] font-bold px-2 py-1.5 rounded-lg border cursor-pointer transition-colors',
@@ -985,7 +983,7 @@ async function doLogout() {
                   {{ entregadoStatus(item.entregado_qty, item.qty) === 'full' ? '✓' : `${item.entregado_qty}/${item.qty}` }}
                 </button>
 
-                <div v-if="!cancelledNames.has(item.nombre)" class="flex gap-1 flex-shrink-0">
+                <div v-if="!item.cancelado" class="flex gap-1 flex-shrink-0">
                   <button @click.stop="openCambio(item)"
                     class="border border-[#E89500]/50 text-[#E89500] text-[.62rem] px-2.5 py-1 rounded-md cursor-pointer tracking-[.03em] whitespace-nowrap bg-transparent">
                     ⚠ Cambiar
