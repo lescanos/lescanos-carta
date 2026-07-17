@@ -153,7 +153,7 @@ El punto `•` dorado en la esquina inferior derecha de la carta digital es el a
 - **Mesas activas**: subtotales estimados de mesas todavía abiertas
 - **Historial completo**: mesas cerradas con moza, método, duración e ítems
 - **Top 8 productos**: ranking del día por cantidad vendida
-- **Cierre de caja**: registra el cierre, cierra todas las mesas abiertas, limpia cocina
+- **Cierre de caja**: registra el cierre y limpia la vista de cocina. El modal muestra el desglose completo por método de pago (solo los que tienen monto > 0) con el efectivo destacado para facilitar el arqueo de caja. El total general aparece al pie del desglose.
 - **Exportación CSV**: compatible con Excel, incluye detalle de todas las sesiones
 
 ### `/admin/usuarios` — Panel de administración

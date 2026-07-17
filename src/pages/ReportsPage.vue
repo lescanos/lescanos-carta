@@ -401,14 +401,36 @@ async function doLogout() {
 
           <!-- Resumen si no hay bloqueos -->
           <template v-else>
-            <div class="bg-white/[.04] border border-gold/[.1] rounded-lg px-4 py-3 mb-3">
-              <div class="flex justify-between items-center">
-                <span class="text-[.72rem] text-gray-500">Total del día</span>
-                <span class="font-display text-[1.15rem] font-black text-gold">${{ cierreData.total.toLocaleString('es-AR') }}</span>
+            <!-- Desglose por método de pago -->
+            <div class="bg-white/[.04] border border-gold/[.1] rounded-lg overflow-hidden mb-3">
+              <template v-for="m in METODOS" :key="m.id">
+                <div v-if="cierreData[m.id as keyof typeof cierreData] > 0"
+                  :class="['flex justify-between items-center px-4 py-2.5 border-b border-white/[.04] last:border-0',
+                    m.id === 'efectivo' ? 'bg-green-500/[.06]' : '']">
+                  <span class="text-[.78rem] text-gray-300 flex items-center gap-2">
+                    <span>{{ m.icon }}</span>
+                    <span>{{ m.label }}</span>
+                    <span v-if="m.id === 'efectivo'"
+                      class="text-[.6rem] text-green-400/70 tracking-[.06em] uppercase border border-green-400/30 rounded px-1.5 py-0.5">
+                      arqueo
+                    </span>
+                  </span>
+                  <span class="font-display text-[.9rem] font-bold text-white">
+                    ${{ (cierreData[m.id as keyof typeof cierreData] as number).toLocaleString('es-AR') }}
+                  </span>
+                </div>
+              </template>
+              <!-- Total -->
+              <div class="flex justify-between items-center px-4 py-3 bg-gold/[.06] border-t border-gold/20">
+                <span class="text-[.78rem] text-gold font-bold tracking-[.04em]">Total del día</span>
+                <span class="font-display text-[1.1rem] font-black text-gold">${{ cierreData.total.toLocaleString('es-AR') }}</span>
               </div>
             </div>
+            <p class="text-[.65rem] text-gray-600 text-center mb-3 tracking-[.03em]">
+              Contá el efectivo del cajón y verificá que coincida antes de confirmar.
+            </p>
             <textarea v-model="cierreNotas" placeholder="Notas del cierre (opcional)..."
-              class="w-full bg-white/[.05] border border-gold/[.18] text-[#ccc] text-[.8rem] px-2.5 py-2.5 rounded-lg resize-none h-[64px] mb-3 focus:outline-none"
+              class="w-full bg-white/[.05] border border-gold/[.18] text-[#ccc] text-[.8rem] px-2.5 py-2.5 rounded-lg resize-none h-[56px] mb-3 focus:outline-none"
               style="font-family:inherit"
             ></textarea>
           </template>

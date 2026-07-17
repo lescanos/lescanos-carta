@@ -189,10 +189,12 @@ Tener abiertos en distintas pestañas/dispositivos:
 3. Bajar hasta el historial de mesas cerradas
 4. Mostrar el top de productos del día
 5. Señalar el botón "Exportar CSV"
-6. Mostrar el botón "Cierre de caja"
+6. Mostrar el botón "Cierre de caja" → se abre el modal de cierre
+7. **Mostrar el desglose por método de pago en el modal**: solo aparecen los métodos con monto > 0. Efectivo aparece resaltado con la etiqueta "arqueo" — es el único que requiere conteo físico del cajón.
+8. Completar una nota opcional y confirmar
 
 **Punto clave:**
-> *"Con un toque exporta todo a Excel. Ideal para la contadora."*
+> *"Antes de confirmar el cierre, el sistema muestra exactamente cuánto debería haber en efectivo en el cajón. La persona que cierra cuenta los billetes, verifica que coincida, y recién entonces confirma. Igual que en cualquier POS profesional."*
 
 ---
 
