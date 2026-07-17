@@ -227,6 +227,7 @@ Las migraciones están en `supabase/migrations/` y se aplican automáticamente c
 | `20240115` | Brand config: seed de claves `brand_*` en tabla `config` (nombre, dominio, contacto) |
 | `20240116` | RLS: política `anon` para leer claves `brand_%` de `config` (necesario para login) |
 | `20240117` | `pedido_items.cancelado` — columna para cancelación de ítems con descuento inmediato |
+| `20240118` | `cierres.notas` — campo de notas opcional en el cierre de caja |
 
 ---
 
