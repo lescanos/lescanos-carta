@@ -234,6 +234,11 @@ const sessionTotalAdjusted = computed(() =>
     .reduce((s, i) => s + cart.parsePrecio(i.precio) * i.qty, 0)
 )
 
+// Ítems entregados pendientes (sin cancelados, sin entregados completos)
+const itemsSinEntregar = computed(() =>
+  sessionItemsDisplay.value.filter(i => !i.cancelado && i.entregado_qty < i.qty).length
+)
+
 const grandTotalAdjusted = computed(() => {
   const base = cart.cartTotal + sessionTotalAdjusted.value
   return cart.mesaKey?.startsWith('envio_') ? base + costoEnvio.value : base
@@ -408,6 +413,7 @@ const METODOS = [
 ]
 
 async function openPayment() {
+  if (itemsSinEntregar.value > 0) return
   if (cart.cart.length > 0) {
     if (!confirm('Hay items pendientes de envío. ¿Cerrar la mesa igual?')) return
   }
@@ -1037,8 +1043,16 @@ async function doLogout() {
           class="w-full mt-2 py-2.5 text-gold border-[1.5px] border-gold/40 text-[.82rem] font-bold rounded-[10px] tracking-[.04em] bg-transparent cursor-pointer">
           ← Volver a mesas
         </button>
+        <div v-if="itemsSinEntregar > 0"
+          class="w-full mt-2 py-2 text-center text-[.72rem] text-amber-400/70 tracking-[.04em]">
+          {{ itemsSinEntregar }} item{{ itemsSinEntregar > 1 ? 's' : '' }} sin entregar
+        </div>
         <button @click="openPayment"
-          class="w-full mt-2 py-2.5 text-red-400/70 border-[1.5px] border-red-500/30 text-[.82rem] font-bold rounded-[10px] tracking-[.04em] bg-transparent cursor-pointer">
+          :disabled="itemsSinEntregar > 0"
+          :class="['w-full mt-1 py-2.5 border-[1.5px] text-[.82rem] font-bold rounded-[10px] tracking-[.04em] bg-transparent transition-opacity',
+            itemsSinEntregar > 0
+              ? 'text-red-400/30 border-red-500/15 cursor-not-allowed opacity-40'
+              : 'text-red-400/70 border-red-500/30 cursor-pointer']">
           Cerrar mesa
         </button>
       </div>
