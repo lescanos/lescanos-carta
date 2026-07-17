@@ -124,6 +124,10 @@ El punto `•` dorado en la esquina inferior derecha de la carta digital es el a
 **Cambios y cancelaciones**
 - Flujo diferenciado con tipo de pedido: `pedido` / `cambio` / `cancelacion`
 - Las tarjetas en cocina cambian de color según el tipo (naranja = cambio, rojo = cancelación)
+- **Cancelación con descuento inmediato**: al cancelar un ítem ya enviado, se marca como `cancelado=true` en la BD, se descuenta del total al instante, y queda visible tachado en rojo con etiqueta "Cancelado". Los botones de entrega/cambio/cancelar se ocultan. La actualización llega por Realtime sin necesidad de refresh.
+
+**Cierre de mesa**
+- **Bloqueo por ítems sin entregar**: el botón "Cerrar mesa" se deshabilita si hay ítems (cocina o barra) que la moza no marcó como entregados. Se muestra un contador "X item(s) sin entregar" en ámbar. El bloqueo aplica a comida y bebidas por igual — el criterio es el ✓ de entrega de la moza, no el estado de cocina.
 
 **Notificaciones**
 - Banner "Pedido listo — Mesa X" visible en cualquier pantalla cuando cocina marca listo
@@ -188,7 +192,8 @@ sesiones         id, mesa, estado, tipo, cubiertos, moza_id, moza_nombre,
 pedidos          id, sesion_id, estado, tipo, listo_at, created_at
                  tipo: 'pedido' | 'cambio' | 'cancelacion' | 'barra'
 pedido_items     id, pedido_id, sesion_id, nombre, precio, qty, nota, seccion,
-                 entregado_qty  ← tracking de entrega ítem por ítem
+                 entregado_qty,  ← tracking de entrega ítem por ítem
+                 cancelado       ← true cuando la moza cancela el ítem
 pagos            id, sesion_id, metodo, monto, created_at
 cierres          id, fecha, total, efectivo, debito, credito,
                  transferencia, mercadopago, pedidosya, notas, created_at
@@ -219,6 +224,9 @@ Las migraciones están en `supabase/migrations/` y se aplican automáticamente c
 | `20240112` | `pedido_items` en publicación Realtime |
 | `20240113` | RLS UPDATE columna-level en `entregado_qty`; cocina bloqueada |
 | `20240114` | `pedidos.tipo = 'barra'`; `menu_secciones.va_a_cocina`; bebidas marcadas como barra |
+| `20240115` | Brand config: seed de claves `brand_*` en tabla `config` (nombre, dominio, contacto) |
+| `20240116` | RLS: política `anon` para leer claves `brand_%` de `config` (necesario para login) |
+| `20240117` | `pedido_items.cancelado` — columna para cancelación de ítems con descuento inmediato |
 
 ---
 
@@ -237,7 +245,7 @@ Todas las tablas tienen RLS habilitado. Resumen de políticas:
 | `pedido_items` | — | SELECT + write; UPDATE `entregado_qty` solo moza/caja/dueño | ALL |
 | `pagos` | — | SELECT + write | ALL |
 | `cierres` | — | SELECT + write (caja/dueño) | ALL |
-| `config` | SELECT | SELECT + write (dueño) | ALL |
+| `config` | SELECT claves `brand_%` (sin auth) | SELECT + write (dueño) | ALL |
 | `menu_secciones` | SELECT | SELECT + write (dueño) | ALL |
 | `menu_items` | SELECT | SELECT + write (dueño) | ALL |
 

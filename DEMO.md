@@ -109,13 +109,37 @@ Tener abiertos en distintas pestañas/dispositivos:
 2. **Volver a la pestaña de mesas** — mostrar la notificación "Pedido listo — Mesa 1"
 3. La notificación es visible aunque la moza esté en otra mesa o pantalla
 
-### 3.7 Cerrar la mesa con pago
+### 3.7 Cancelar un ítem ya enviado
 
-1. Volver a la Mesa 1
-2. Tocar "Cerrar mesa"
-3. Seleccionar método de pago (ej: MercadoPago)
-4. Confirmar
-5. La mesa vuelve a gris en la grilla — lista para el próximo cliente
+> *"Pasa todo el tiempo: el cliente cambió de opinión o se equivocó al pedir."*
+
+1. En la sección "Ya enviado", tocar "✕ Cancelar" en cualquier ítem
+2. Confirmar el diálogo
+3. Mostrar que **el ítem queda tachado en rojo** con la etiqueta "Cancelado"
+4. Señalar que el **total bajó inmediatamente** — ya no incluye ese ítem
+5. **Cambiar a la pestaña de cocina** — llegó una tarjeta roja "🚫 CANCELAR" con el ítem
+
+**Punto clave:**
+> *"La cancelación llega a cocina en tiempo real y se descuenta del total al instante. Sin papel, sin confusiones, sin tener que recalcular nada a mano."*
+
+### 3.8 Bloqueo de cierre si hay ítems sin entregar
+
+> *"El sistema impide cerrar la mesa si todavía hay comida o bebidas que no llegaron a la mesa."*
+
+1. Con ítems sin el ✓ de entrega, tocar "Cerrar mesa"
+2. Mostrar que el botón **no hace nada** y aparece el aviso "X item(s) sin entregar" en ámbar
+3. Marcar todos los ítems como entregados (✓ verde)
+4. Ahora el botón "Cerrar mesa" se habilita
+
+**Punto clave:**
+> *"Evita que la caja cierre la cuenta antes de que la mesa recibió todo. Ningún cliente se va sin su pedido completo."*
+
+### 3.9 Cerrar la mesa con pago
+
+1. Con todos los ítems entregados, tocar "Cerrar mesa"
+2. Seleccionar método de pago (ej: MercadoPago)
+3. Confirmar
+4. La mesa vuelve a gris en la grilla — lista para el próximo cliente
 
 ---
 
